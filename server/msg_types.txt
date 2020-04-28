@@ -1,0 +1,23 @@
+Types of messages
+01: Message to be printed by server
+02: Ack of 01
+03: Device requests to close connection
+04: Server informs device that the connection will be terminated. Structure: reason:string
+10: Initialization of a new device. Structure: name:string,CCA_1:string,CCA_2:string,...
+11: Ack of 10
+21: Server sends configuration. Structure: tbd
+22: Ack of 21
+23: Server sends command to execute a test with a specified configuration.
+    Structure: config_name:string
+24: Ack of 23
+
+
+
+device = {
+                    "socket": client,
+                    "addr": addr,
+                    "name": "Not_initialized",
+                    "CCA": [],
+                    "write_buff": [],
+                    "last_flag": False
+                }
