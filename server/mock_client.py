@@ -6,15 +6,20 @@ This mock client is supposed to test the functionalities of the server.
 Currently it connects to the server & sends an initialization message, then sends a message to be printed
 """
 
-terminate_self = False #set this flag so that the mock_client terminates after last message sent
+terminate_self = False #set this flag so that the mock_client terminates after it sent its messages. On False it will continue to
+                        #read until the server shuts down the connection
 
 
-HOST = '127.0.0.1'  # The server's hostname or IP address
+HOST = '192.168.1.121'#'127.0.0.1'  # The server's hostname or IP address
 PORT = 65432        # The port used by the server
 send_msg = []
-end_flag = True #flag to stop  the server_loop
+end_flag = False #flag to stop  the server_loop
+name = "Bob"
 
 def handle_msg(data):
+    if not data:
+        global end_flag
+        end_flag = True
     data = data.decode('utf-8').split(',') #formatts the data into a list of strings
     msg_type, msg_data = int(data[0]), data[1:]
     types = {
@@ -35,18 +40,18 @@ def handle_msg04(msg):
     #server closes connection, mock client terminates
     print(f"Connection closed because: {msg[0]}")
     global end_flag
-    end_flag = False   
+    end_flag = True   
 
 def handle_msg11(msg):
     send_msg.append(bytes("01,Mock client worked", encoding='utf-8'))
 
 def main():
     
-    send_msg.append(bytes("10,Bob,CCA_1,CCA_2", encoding='utf-8'))
+    send_msg.append(bytes(f"10,{name},CCA_1,CCA_2", encoding='utf-8'))
 
     conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     conn.connect((HOST, PORT))
-    while (end_flag):
+    while (not end_flag):
         ready_to_read, ready_to_write, in_error = select.select([conn], [conn], [conn], 10)
         for s in ready_to_read:
             data = s.recv(4096)

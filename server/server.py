@@ -6,7 +6,7 @@ import queue
 
 import server_frontend
 
-HOST = '127.0.0.1'  # Standard loopback interface address (localhost)
+HOST = ''#'127.0.0.1'  # Standard loopback interface address (localhost)
 PORT = 65432        # Port to listen on (non-privileged ports are > 1023)
 
 socket_list = [] #list with all active sockets
@@ -30,6 +30,7 @@ def start_UI():
     #TODO implement start_UI
     frontend_thread = threading.Thread(target=server_frontend.main, args=(send_queue, device_queue, signal_queue))
     frontend_thread.start()
+    return frontend_thread
 
 def server_loop():
     #setup the server
@@ -42,7 +43,7 @@ def server_loop():
     terminate = False
 
     while(not terminate):
-        ready_to_read, ready_to_write, in_error = select.select(socket_list, write_list, socket_list, 2)
+        ready_to_read, ready_to_write, in_error = select.select(socket_list, write_list, socket_list, .5)
         #print(f"ready_to_write: {ready_to_write}")
         #Read messages from devices
         for s in ready_to_read:
@@ -57,12 +58,13 @@ def server_loop():
                     "name": "Not_initialized",
                     "CCA": [],
                     "write_buff": [],
-                    "last_flag": False
+                    "close_flag": False
                 }
                 devices.append(device)
             else:
+                #potentially reads multiple messages, in practice only one message arrives in read intervall
                 data = s.recv(4096)
-                device = find_device(s)
+                device = find_device_by_socket(s)
                 handle_msg(data, device)
                 
         #Send messages to devices
@@ -70,15 +72,17 @@ def server_loop():
             if (s == server_socket):
                 raise RuntimeError("Cannot write to server_socket")
             else:
-                device = find_device(s)
+                device = find_device_by_socket(s)
                 msg = device["write_buff"][0]
                 device["write_buff"].remove(msg)
                 msg = bytes(msg, encoding='utf-8')
                 s.sendall(msg)
-                write_list.remove(s)
+                if not device["write_buff"]:
+                    #remove the device from the write_list if no more message is waiting to be sent
+                    write_list.remove(s)
 
-                #the sent message is 04, closing the connection. The device can now be removed.
-                if device["last_flag"]:
+                #the sent message is 04, closing the connection. The device can n
+                if device["close_flag"] and (not device["write_buff"]):
                     remove_device(device)
 
         #TODO loop over in_error
@@ -97,8 +101,8 @@ def update():
         if i == 1:
             shutdown()
         else:
-            #TODO implement different signal handling
-            pass
+            #i == 2 #update available devices
+            device_queue.put(devices)
     except queue.Empty: pass #no signal received, can continue
 
     #TODO get messages to send from send_queue
@@ -112,15 +116,23 @@ def shutdown():
     shutdown_flag = True
     for d in devices:
         send_msg("04,Server shutting down", d)
-        d["last_flag"]=True
+        d["close_flag"]=True
 """
 Finds the device belonging to the socket s
 """
-def find_device(s):
+def find_device_by_socket(s):
     for d in devices:
         if d["socket"] == s:
             return d
     raise RuntimeError("Tried to find Invalid socket")
+"""
+Finds the device belonging to the name
+"""
+def find_device_by_name(name):
+    for d in devices:
+        if d["name"] == name:
+            return d
+    raise RuntimeError(f"Could not find device with name {name}")
 
 """
 Removes device from all queues and closes the corresponding socket
@@ -141,6 +153,7 @@ and then calls the function handling this type. To view the different types of m
 """
 def handle_msg(data, device):
     if not data:
+        #device has closed the connection
         remove_device(device)
         return
     data = data.decode('utf-8').split(',') #formatts the data into a list of strings
@@ -156,7 +169,6 @@ def handle_msg(data, device):
     except KeyError:
         print("Invalid msg_type {0}".format(msg_type))
     
-
 def handle_msg01(msg_data, device):
     print("{0} writes".format(device["name"]))
     for str in msg_data:
@@ -166,13 +178,12 @@ def handle_msg01(msg_data, device):
 
 def handle_msg03(msg_data, device):
     send_msg("04,Device requested closing", device)
-    device["last_flage"]=True
+    device["close_flag"]=True
 
 def handle_msg10(msg_data, device):
     name, ccas = msg_data[0], msg_data[1:]
     device["name"] = name
     device["CCA"] = ccas
-    device_queue.put(device)
     send_msg("11,ack 01", device)
 
 """
@@ -187,8 +198,9 @@ def send_msg(response, device):
 
 def main():
     
-    start_UI()
+    frontend_thread = start_UI()
     server_loop()
+    frontend_thread.join()
 
 if __name__ == "__main__":
     main()
