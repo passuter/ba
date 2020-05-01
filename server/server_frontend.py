@@ -1,77 +1,78 @@
 import time
 import queue
 from tkinter import *
+from tkinter import filedialog
+from socket import inet_aton #used to check wheter an IP is valid or not
 
 import server
 
 #Queues for inter thread communication
-send_queue:queue.Queue
+config_queue:queue.Queue
 device_queue:queue.Queue
 signal_queue:queue.Queue
 
 #global variables
 root:Tk
-selected_config = ""
+active_config:dict = None
 devices = []
-window_width = 500
-window_height = 500
-index=-1
+index=-1 #index to store which device is currently selected. get the selected device with devices[index]
+
+#global parameters
+window_width = 600
+window_height = 600
+default_btn_width = 20
 
 class Separator(Frame):
-    def __init__(self, parent):
-        Frame.__init__(self, parent, height=30)
+    def __init__(self, parent, height=10):
+        Frame.__init__(self, parent, height=height)
 
 class Back_to_home_btn(Button):
     def __init__(self, parent):
         Button.__init__(self, parent, text="BACK to HOME", fg="red")
         self["command"]=lambda: close_and_call(parent, home)
 
-class Config_frame(Frame):
-    def __init__(self, parent):
-        Frame.__init__(self, parent, width=window_width, height=200)
-        lbl1 = Label(self, text="selected configuration")
-        if selected_config == "": display_config = "None"
-        else: display_config = selected_config
-        lbl2 = Label(self, text=display_config)
-        btn_new_config = Button(self, text="Create new", width=10)
-        btn_new_config['command']= lambda: close_and_call(parent, lambda:hi_foo("TODO implement creating new config"))
-        #TODO add button to edit current selected config
-        btn_sel_config = Button(self, text="Select config", width=10)
-        btn_sel_config['command']= lambda: close_and_call(parent, lambda:hi_foo("TODO implement select config"))
-        lbl1.pack(side=TOP, fill=X)
-        lbl2.pack(side=TOP, fill=X)
-        btn_new_config.pack(side=LEFT)
-        btn_sel_config.pack(side=RIGHT)
+class Ok_btn(Button):
+    def __init__(self, parent, cmd):
+        Button.__init__(self, parent,text="OK", fg="green", command=cmd, width=default_btn_width)
 
-"""
-Lists all devices and one can select one device, which is then passed to the function
-on_select as an argument
-"""
-class Device_selection(Frame):
-    def __init__(self, parent):
-        Frame.__init__(self, parent)
+class Back_btn(Button):
+    def __init__(self, parent, cmd):
+        Button.__init__(self, parent, text="CANCEL", fg="red", command=cmd, width=default_btn_width)
+
+class Device_selection_lb(Listbox):
+    """
+    Lists all devices and one can select one device
+    """
+    def __init__(self, parent, return_cmd):
+        Listbox.__init__(self, parent, selectmode=SINGLE)
+        self.return_cmd = return_cmd
         self.parent = parent
-        self.lb = Listbox(self, selectmode=SINGLE)
-        self.lb.pack()
         for d in devices:
-            self.lb.insert(END, d["name"])
-        self.lb.bind('<<ListboxSelect>>', self.on_dev_select)
+            self.insert(END, d["name"])
+        self.bind('<<ListboxSelect>>', self.on_dev_select)
     
     def on_dev_select(self, evt):
         w = evt.widget
         try:
             global index
             index = w.curselection()[0]
-            close_and_call(self.parent, view_dev)
+            close_and_call(self.parent, lambda:select_dev(self.return_cmd)) #close parent and reload device selection window
         except IndexError: pass #if nothing is selected w.curselection()[0] fails
 
-class Devices_frame(Frame):
-    def __init__(self, parent):
+class Device_selection_frame(Frame):
+    """
+    Shows all connected devices and user can select one device.
+    return_cmd specifies what to do after selection (i.e. after pressing CANCEL or OK)
+    CANCEL does the same as OK but undoes the selection (i.e. setting global index to -1)
+    """
+    def __init__(self, parent, return_cmd):
         Frame.__init__(self, parent, width=window_width, height=window_height)
-        btn_back = Back_to_home_btn(self)
+        bot_frame = Frame(self)
+        btn_ok = Ok_btn(bot_frame, lambda: close_and_call(self, return_cmd))
+        btn_cancel = Back_btn(bot_frame, lambda:self.back(return_cmd))
         btn_update = Button(self, text="UPDATE available devices", fg="blue")
-        btn_update["command"] = lambda: close_and_call(self, lambda:call2(update_dev, view_dev))
-        select = Device_selection(self)
+        btn_update["command"] = lambda: close_and_call(self, lambda:call2(update_dev, lambda:select_dev(return_cmd)))
+        select = Device_selection_lb(self, return_cmd)
         if index == -1:
             lbl = Label(self, text="Select a device to see information")
         else:
@@ -79,64 +80,70 @@ class Devices_frame(Frame):
             lbl = Label(self, text=f"Name: {dev['name']}\nAddress: {dev['addr']}\nAvailable CCA: {dev['CCA']}")
 
         btn_update.pack(side=TOP)
-        btn_back.pack(side=BOTTOM)
+        bot_frame.pack(side=BOTTOM)
+        btn_ok.pack(side=RIGHT)
+        btn_cancel.pack(side=LEFT)
         select.pack(side=LEFT)
         lbl.pack(side=RIGHT)
 
-"""
-The main window
-"""
+    def back(self, return_cmd):
+        global index
+        index = -1 #returns without selecting anything
+        close_and_call(self, return_cmd)
+
 class Home(Frame):
+    """
+    The main window
+    """
     def __init__(self, parent):
         Frame.__init__(self, parent, width=window_width, height=window_height)
         self.pack(fill=BOTH)
-        sep1 = Separator(self)
+        sep1 = Separator(self, 30)
         
         btn_view_dev = Button(self, text="See connected devices", fg="blue", height=2)
-        btn_view_dev['command'] = lambda: close_and_call(self, view_dev)
+        btn_view_dev['command'] = lambda: close_and_call(self, lambda:select_dev(home))
 
         config_frame = Config_frame(self)
 
         button_quit = Button(self, text="QUIT", bg="red", height=2)
-        button_quit['command'] = lambda: shutdown(signal_queue)
+        button_quit['command'] = shutdown
 
         btn_view_dev.pack(side=TOP, fill=X)
         config_frame.pack(side=TOP)
         sep1.pack()
         button_quit.pack(side=BOTTOM, fill=X)
 
-"""
-Creates the main window
-"""
+
 def home():
+    """
+    Creates the main window
+    """
     Home(root)
 
-"""
-Shows available devices, full information for the device pass as argument dev
-"""
-def view_dev():
-    frame = Devices_frame(root)
+def select_dev(return_cmd):
+    """
+    Shows available devices and allows to select
+    """
+    frame = Device_selection_frame(root, return_cmd)
     frame.pack(fill=BOTH)
-    #TODO show devices
 
-
-"""
-updates the devices list
-"""
 def update_dev():
+    """
+    updates the devices list, deletes device selection
+    """
+    if not device_queue: return#when testing without active server (e.g. for testing), update_dev() fails as no queues exist
     signal_queue.put(2)
-    #time.sleep(2)
-    try: dev = device_queue.get(timeout=3) #wait for server to fill queue
+    try: dev:list = device_queue.get(timeout=3) #wait for server to fill queue
     except queue.Empty: print("Error: Unable to update devices")
     global devices, index
-    index = -1
+    index = -1 #reset device selection. Otherwise it might lead to an Index out of Bound error should some device(s) have disconnected
     devices = dev
 
-"""
-This function creates a placeholder window with the str argument as text.
-str: string
-"""
 def hi_foo(str):
+    """
+    This function creates a placeholder window with the str argument as text.
+    str: string
+    """
     frame = Frame(root)
     frame.pack(fill=BOTH)
 
@@ -146,35 +153,505 @@ def hi_foo(str):
     btn = Back_to_home_btn(frame)
     btn.pack()
 
-
-"""
-Function that destroys the argument to_close & calls 2nd argument foo()
-"""
 def close_and_call(to_close, foo):
+    """
+    Function that destroys the argument to_close & calls 2nd argument foo()
+    """
     to_close.destroy()
     foo()
 
-def shutdown(signal_queue):
-    signal_queue.put(1)
+def shutdown():
+    if signal_queue: signal_queue.put(1)
     quit()
 
-"""
-Calls both functions f1 & f2
-"""
 def call2(f1, f2):
+    """
+    Calls both functions f1 & f2
+    """
     f1()
     f2()
 
-def main(snd_queue:queue.Queue, dvice_queue:queue.Queue, signl_queue:queue.Queue):
-    global send_queue, device_queue, signal_queue, root
+def get_dev_by_name(dev_list:list, name):
+    """
+    Gets a dictionary from a list of dictionaries where the name field matches the second argument.
+    Works with list of devices & list of device_configurations
+    Returns None if not found
+    """
+    for d in dev_list:
+        if d["name"] == name: return d
+    return None
+
+
+################################################################# below: deals with configurations######################################################################################################
+class Config_frame(Frame):
+    """
+    Interface for choosing to select, run, add or modify a test configuration
+    """
+    def __init__(self, parent):
+        Frame.__init__(self, parent, width=window_width, height=300)
+        lbl1 = Label(self, text="selected configuration")
+        if active_config == None: display_config = "None"
+        else: display_config = active_config["name"]
+        lbl2 = Label(self, text=display_config)
+
+        mid_frame = Frame(self)
+        btn_new_config = Button(mid_frame, text="Create new", width=15)
+        btn_new_config['command']= lambda: close_and_call(parent, new_conf)
+        btn_edit_config = Button(mid_frame, text="Edit current", width=15)
+        btn_edit_config['command']= lambda: close_and_call(parent, mod_config)
+        btn_sel_config = Button(mid_frame, text="Select existing", width=15)
+        btn_sel_config['command']= lambda: close_and_call(parent, load_conf)
+
+        sep = Separator(self)
+        btn_run = Button(self, text="RUN this configuration", fg="green", width=default_btn_width)
+        btn_run['command']=run_conf
+
+
+        lbl1.pack(side=TOP, fill=X)
+        lbl2.pack(side=TOP, fill=X)
+        mid_frame.pack()
+        btn_new_config.pack(side=LEFT)
+        btn_edit_config.pack(side=LEFT)
+        btn_sel_config.pack(side=LEFT)
+        sep.pack()
+        btn_run.pack(side=BOTTOM)
+
+class New_config_frame(Frame):
+    def __init__(self, parent):
+        Frame.__init__(self, parent)
+        lbl = Label(self, text="Enter name of test configuration")
+        self.e = Entry(self)
+        btn = Button(self, text="Continue", fg="green")
+        btn["command"]=self.ok
+        back_btn = Back_to_home_btn(self)
+
+        lbl.pack(side=TOP)
+        self.e.pack()
+        btn.pack(side=RIGHT)
+        back_btn.pack(side=LEFT)
+
+    def ok(self):
+        conf_name= self.e.get()
+        loc = filedialog.asksaveasfilename(title = "Save as", filetypes = (("text files","*.txt"),("all files","*.*")))
+        if conf_name == '' or loc == '': return
+        config = create_config(conf_name, loc, 0, [])
+        global active_config
+        active_config = config
+        close_and_call(self, lambda: mod_config())
+
+class Mod_config_frame(Frame):
+    def __init__(self, parent):
+        Frame.__init__(self, parent)
+        top_lbl = Label(self, text=f"Modify configuration \"{active_config['name']}\"")
+        server_config = Label(self, text="IMPROVE: change server configuration", height=6)
+        
+        
+        self.lb = Listbox(self, selectmode=SINGLE)
+        dev_confs = active_config["dev_configs"]
+        for i in range(active_config["num_of_dev"]):
+            self.lb.insert(END, dev_confs[i]["name"])
+        self.lb.bind('<<ListboxSelect>>', self.on_dev_select)
+
+        self.lbl = Label(self, text="No device selected")
+        mod_btn = Button(self, text="Modify selected device", command=self.on_modify, width=default_btn_width)
+        rm_btn = Button(self, text="Remove selected device", command=self.on_rm, width=default_btn_width)
+        add_btn = Button(self, text="Add a new device", command=self.on_add, width=default_btn_width)
+        separator = Separator(self)
+
+        bot_frame = Frame(self)
+        ok_btn = Ok_btn(bot_frame, lambda: close_and_call(self, home))
+        save_btn = Button(bot_frame, text="SAVE", fg="green", command=save_conf, width=default_btn_width)
+        ok_btn.pack(side=RIGHT)
+        save_btn.pack(side=LEFT)
+
+        top_lbl.pack(side=TOP)
+        server_config.pack(side=TOP)
+        bot_frame.pack(side=BOTTOM)
+        separator.pack(side=BOTTOM)
+        add_btn.pack(side=BOTTOM)
+        rm_btn.pack(side=BOTTOM)
+        mod_btn.pack(side=BOTTOM)
+        self.lb.pack(side=LEFT)
+        self.lbl.pack(side=RIGHT)
+        
+    def get_selected_dev(self):
+        try: index = self.lb.curselection()[0]
+        except IndexError: return None #if nothing is selected w.curselection()[0] fails
+        name = self.lb.get(index)
+        dev = None
+        for d in active_config["dev_configs"]:
+            if d["name"] == name:
+                dev = d
+                break
+        return dev
+    
+    def on_dev_select(self, evt):
+        dev_conf = self.get_selected_dev()
+        if dev_conf == None: return
+
+        count = 0 #counts number of CCAs displayed
+        max_displ = 5
+        text = f"Device Name: {dev_conf['name']}\nRuntime: {dev_conf['length']}s\nIperf Address: {dev_conf['addr']}\nTrace: {dev_conf['trace']}\nCCAs (shows maximal {max_displ}):"
+        for cca in dev_conf["CCAs"]:
+            count += 1
+            if count > max_displ: break
+            text += f"\n{cca}"
+        self.lbl['text'] = text
+    
+    def on_modify(self):
+        dev_conf = self.get_selected_dev()
+        if dev_conf == None: return
+        device = get_dev_by_name(devices, dev_conf['name'])
+        if device == None: print(f"Cannot modifiy, {dev_conf['name']} not connected")
+        else: close_and_call(self, lambda:mod_dev_config(device, dev_conf))
+
+    def on_add(self):
+        close_and_call(self, lambda: add_dev_config1())
+
+    def on_rm(self):
+        dev_conf = self.get_selected_dev()
+        if dev_conf == None: return
+        active_config['dev_configs'].remove(dev_conf)
+        active_config['num_of_dev'] -= 1
+        close_and_call(self, mod_config)
+
+    
+class Mod_dev_config_frame(Frame):
+    def __init__(self, parent, device, device_config):
+        Frame.__init__(self, parent)
+        self.dev_name = device['name']
+        top_lbl = Label(self, text=f"Configuration: \"{active_config['name']}\", Device: \"{self.dev_name}\"")
+        bot_frame = Frame(self)
+        btn_back = Back_btn(bot_frame, cmd=lambda: close_and_call(self,mod_config))
+        btn_ok = Ok_btn(bot_frame, self.ok_action)
+
+        #Frame to hold entry boxes to enter the config of the device
+        #expose entries with self to functions in class
+        lhs = Frame(self)
+        length_lbl = Label(lhs, text="Enter length of test in seconds")
+        length_lbl.grid(row=0, column=0)
+        self.length_entry = Entry(lhs)
+        self.length_entry.grid(row=0, column=1)
+        self.length_entry.insert(END, device_config['length'])
+        trace_lbl = Label(lhs, text="Placeholder to select trace")
+        trace_lbl.grid(row=1)
+        ip, port = device_config['addr']
+        ip_lbl = Label(lhs, text="Enter ip of iperf server")
+        ip_lbl.grid(row=2, column=0)
+        self.ip_entry = Entry(lhs)
+        self.ip_entry.grid(row=2, column=1)
+        self.ip_entry.insert(END, ip)
+        port_lbl = Label(lhs, text="Enter port of iperf server")
+        port_lbl.grid(row=3, column=0)
+        self.port_entry = Entry(lhs)
+        self.port_entry.grid(row=3, column=1)
+        self.port_entry.insert(END, port)
+
+
+        #Frame to hold lisbox widget to select the CCAs
+        rhs = Frame(self)
+        cca_lbl = Label(rhs, text="Select CCA(s) to be used")
+        cca_lbl.pack()
+        self.lb = Listbox(rhs, selectmode=EXTENDED)
+        self.lb.pack()
+        for cca in device['CCA']:
+            self.lb.insert(END, cca)
+
+
+        top_lbl.pack(side=TOP)
+        bot_frame.pack(side=BOTTOM)
+        lhs.pack(side=LEFT)
+        rhs.pack(side=RIGHT)
+        btn_back.pack(side=LEFT)
+        btn_ok.pack(side=RIGHT)
+    
+    def ok_action(self):
+        """
+        Reads all values and checks if they are sensible and result in a correct device configuration
+        """
+        correct_values = True
+        try: length = int(self.length_entry.get())
+        except ValueError: print("Invalid entry for length, must be a single integer strictly larger than 0"); correct_values = False    
+        ip = self.ip_entry.get()
+        try: port = int(self.port_entry.get())
+        except ValueError: print("Invalid entry for port, must be a single integer"); correct_values = False
+        indices = self.lb.curselection()
+        ccas = []
+        for i in indices:
+            ccas.append(self.lb.get(i))
+        
+        if correct_values:
+            dev_config = create_dev_conf(self.dev_name, length, "default", (ip, port), len(ccas), ccas)
+            if is_valid_dev_config(dev_config, print_error=print): self.ok(dev_config)
+            else: pass #some entry was invalid, nothing to do
+        else: pass #some entry was invalid, nothing to do
+
+    def ok(self, dev_conf):
+        """
+        Adds the dev_conf to the currently active configuration (removes duplicates if necessary)
+        """
+        #remove duplicate
+        for d in active_config['dev_configs']:
+            if d['name'] == dev_conf['name']:
+                active_config['dev_configs'].remove(d)
+                active_config['num_of_dev'] -= 1
+        
+        #add dev_conf
+        active_config['dev_configs'].append(dev_conf)
+        active_config['num_of_dev'] += 1
+        close_and_call(self, mod_config)
+    
+def new_conf():
+    """
+    Ask for name & location of a new configuration
+    """
+    frame = New_config_frame(root)
+    frame.pack()
+
+def mod_config():
+    """
+    Modify the selected config
+    """
+    if active_config == None: home()
+    else:
+        frame = Mod_config_frame(root)
+        frame.pack()
+
+def mod_dev_config(device, device_config):
+    """
+    Modify the configuration for a device dev
+    """
+    frame = Mod_dev_config_frame(root, device, device_config)
+    frame.pack()
+
+def add_dev_config1():
+    """
+    First part of selecting a new device for which to add a test configuration & open modify.
+    Updates the devices list & calls the selection function.
+    """
+    update_dev() 
+    select_dev(add_dev_config2)
+
+def add_dev_config2():    
+    """
+    Second part of selecting a new device for which to add a test configuration & open modify.
+    Creates an new, empty configuration for the selected device and calls 
+    """
+    if index == -1: mod_config() #no device selected, return to modify configuration screen
+    else:
+        dev = devices[index]
+        conf = create_dev_conf(dev['name'], 0, 'none', ('0.0.0.0', 0), 0, [])
+        mod_dev_config(dev, conf)
+
+def run_conf():
+    if is_valid_config(print_error=print):
+        config_queue.put(active_config.copy())
+    else:
+        pass #cannot run invalid configuration
+
+def save_conf():
+    """
+    Writes the current configuration to a file
+    """
+    f = open(active_config["location"], 'w')
+    txt = f"{active_config['name']}, Version 1\nServer_settings:tbd\nNumber_of_devices: {active_config['num_of_dev']}\n"
+    for d in active_config['dev_configs']:
+        txt += dev_conf_to_str(d) + f"\n"
+    f.write(txt)
+
+def dev_conf_to_str(dev_conf:dict):
+    """
+    Writes the device configuration into a string (ends it with newline)
+    """
+    ip, port = dev_conf['addr']
+    txt = f"{dev_conf['name']},{dev_conf['length']},{dev_conf['trace']},{ip},{port},{dev_conf['number_of_CCA']}"
+    for cca in dev_conf['CCAs']:
+        txt +=f",{cca}"
+    return txt
+
+
+def load_conf():
+    """
+    Asks for a configuration to open and puts it into active_config.
+    """
+    f_loc = filedialog.askopenfilename(title = "Select file", filetypes = (("text files","*.txt"),("all files","*.*")))
+    if f_loc == '': home() #no file was selected
+    else:
+        f = open(f_loc, mode='r')
+        line_1 = f.readline().split(',')
+        try:
+            name, version = line_1[0], int(line_1[1].split()[1]) #reads name & version number of the configuration file
+            version_handlers = {
+                1: lambda: load_v1(f, name, f_loc)
+            }
+            try: version_handlers[version]() #calls the handler belonging to the version number
+            except KeyError: 
+                print("Invalid configuration version")
+        except IndexError: print("Could not load configuration, reading of name and version failed")
+        home()
+
+#load_v* load a specific version
+def load_v1(f, name, f_loc):
+    server_settings = f.readline() #reads the serversettings, only placeholder for now
+    num_of_dev = int(f.readline().split()[1])
+    dev_list = []
+    for i in range(num_of_dev):
+        l = f.readline()
+        if l == '': #file ended early
+            print("Configuration file corrupted: Less devices than specified")
+            home()
+        l = l.rstrip().split(',') #remove tailing newline & split by ','
+        dev_name = l[0]
+        length = int(l[1])
+        trace = l[2]
+        addr = (l[3], int(l[4]))
+        num_cca = int(l[5])
+        ccas = []
+        for j in range(num_cca):
+            ccas.append(l[6+j])
+        dev_conf = create_dev_conf(dev_name, length, trace, addr, num_cca, ccas)
+        dev_list.append(dev_conf)
+    conf = create_config(name, f_loc, num_of_dev, dev_list)
+    global active_config
+    active_config = conf
+
+def create_dev_conf(dev_name, length, trace, addr, num_cca, ccas):
+    """
+    Helper function to create a device config
+    """
+    d = {
+        "name":dev_name,
+        "length":length,
+        "trace": trace,
+        "addr": addr,
+        "number_of_CCA":num_cca,
+        "CCAs":ccas
+    }
+    return d
+
+def create_config(name, location, num_of_dev, dev_list):
+    """
+    Helper function to create a configuration
+    """
+    conf = {
+            "name": name,
+            "location": location,
+            "num_of_dev": num_of_dev,
+            "dev_configs": dev_list
+        }
+    return conf
+
+def is_valid_config(print_error=None):
+    """
+    Checks wheter the current configuration is a valid configuration.
+    Argument print_error should be a function with an string list argument, which will output the reason(s) if it is invalid.
+    """
+    if active_config == None:
+        print_error(["No configuration selected"])
+        return False
+    correct_values = True #Set to false if any value does not meet criterea
+    error_txt = [f"Invalid configuration \"{active_config['name']}\"\n"]
+    if active_config['name'] == "":
+        correct_values = False
+        error_txt.append(f"Invalid configuration name")
+    num_dev = len(active_config['dev_configs'])
+    if num_dev != active_config['num_of_dev']:
+        correct_values = False
+        error_txt.append("Length of dev_configs list and num_of_dev don't correspond (Internal error)")
+    if num_dev <= 0:
+        correct_values = False
+        error_txt.append("No device in this test")
+    for d in active_config['dev_configs']:
+        correct_values = is_valid_dev_config(d, error_txt.append) and correct_values
+    
+    #check if device is connected and has all specified CCAs
+    update_dev()
+    for dev_conf in active_config['dev_configs']:
+        name = dev_conf['name']
+        device = get_dev_by_name(devices, name)
+        if get_dev_by_name(devices, name) == None:
+            correct_values = False
+            error_txt.append(f"Device \"{name}\" is not connected")
+        else :
+            for cca in dev_conf['CCAs']:
+                if cca not in device['CCA']:
+                    correct_values = False
+                    error_txt.append(f"Device \"{name}\" has no CCA \"{cca}\"")
+
+    if (not correct_values) and print_error:
+        print_error(error_txt)
+    return correct_values
+
+def is_valid_dev_config(dev_config, print_error=None):
+    """
+    Checks wheter a given device configuration is a valid device configuration.
+    Argument print_error should be a function with an string list argument, which will output the reason(s) if it is invalid.
+    """
+    correct_values = True #Set to false if any value does not meet criterea
+    error_txt = [f"Invalid device configuration for {dev_config['name']}"]
+    if dev_config['length'] <= 0: error_txt.append(f"Invalid length, must be strictly larger than 0, is {dev_config['length']}"); correct_values = False
+    correct_values = is_valid_addr(dev_config['addr'], lambda str: error_txt.append(str)) and correct_values
+    num_cca = len(dev_config['CCAs'])
+    if num_cca != dev_config['number_of_CCA']:
+        correct_values = False
+        error_txt.append("Number of selected CCAs is not the same as specified number")
+    if num_cca <= 0:
+        correct_values = False
+        error_txt.append(f"Number of selected CCAs: {num_cca}, must be strictly larger than 0")
+    
+    if (not correct_values) and print_error:
+        print_error(error_txt)
+    return correct_values
+
+def is_valid_addr(addr:tuple, print_error=None):
+    """
+    Checks wheter a given addr is a valid address.
+    Argument print_error should be a function with an string argument, which will output the reason if it is invalid.
+    """
+    valid = True
+    ip, port = addr
+    try:
+        inet_aton(ip)
+    except OSError:
+        valid = False
+        if print_error: print_error("Given ip address is not valid")
+    max_port = 65535
+    if not (port >= 0 and port < max_port):
+        valid = False
+        if print_error: print_error(f"Port range is invalid, must be between 0 (inclusive) and {max_port}")
+    return valid
+        
+##################################### main function####################################################################################################################################################
+def main(conf_queue:queue.Queue, dvice_queue:queue.Queue, signl_queue:queue.Queue):
+    global config_queue, device_queue, signal_queue, root
     root = Tk()
     root.geometry("500x500")
     root.title("Control server")
-    send_queue = snd_queue
+    config_queue = conf_queue
     device_queue = dvice_queue
     signal_queue = signl_queue
+    root.protocol("WM_DELETE_WINDOW", shutdown) #closing the window also triggers a shutdown of the server
     home()
+    #test()
     mainloop()
+
+def test():
+    """
+    opens mod_dev_config screen with a nonexisting device Heidi for testing
+    """
+    global active_config
+    active_config = create_config("Bert", "bert.txt", 0, [])
+    dev = {
+        "socket": None,
+        "addr": ('192.168.1.121', 65432),
+        "name": "Heidi",
+        "CCA": ["CCA1", "CCA2", "CCA3", "CCA4", "CCA5", "CCA6", "CCA7", "CCA8", "CCA9", "CCA10", "CCA11", "CCA12", "CCA13", "CCA14"],
+        "write_buff": [],
+        "last_flag": False
+    }
+    device_conf = create_dev_conf("Heidi", 0, "TBD", ('192.168.1.121', 65000), 0, [])
+    mod_dev_config(dev, device_conf)
+
 
 if __name__ == "__main__":
     main(None, None, None)
