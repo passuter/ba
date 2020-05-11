@@ -85,6 +85,9 @@ def server_loop():
                     remove_device(device)
 
         #TODO loop over in_error
+        #or d in devices:
+            #print(f"{d['name']}: {d['write_buff']}")
+
         update()
 
         #if the shutdown flag is set and all messages have ben sent, end the loop
@@ -117,14 +120,14 @@ def shutdown():
     global shutdown_flag
     shutdown_flag = True
     for d in devices:
-        send_msg("04,Server shutting down", d)
+        send_msg(f",04,Server shutting down\n", d)
         d["close_flag"]=True
 
 def run_conf(conf:dict):
     name = conf['name']
     for dev_conf in conf['dev_configs']:
         d = server_frontend.get_dev_by_name(devices, dev_conf['name'])
-        msg = f"20,{name}," + server_frontend.dev_conf_to_str(dev_conf)
+        msg = f",20,{name}," + server_frontend.dev_conf_to_str(dev_conf) + f"\n"
         send_msg(msg, d)
 
 def find_device_by_socket(s):  
@@ -158,18 +161,18 @@ def remove_device(device):
     except ValueError: pass
     s.close()
 
-def handle_msg(data, device):
+def handle_msg(raw_data, device):
     """
     Reads a received messages. It first splits the msg into a list of strings, reads which type of msg it is
     and then calls the function handling this type. To view the different types of messages, see structures.txt
     """
-    if not data:
+    if not raw_data:
         #device has closed the connection
         remove_device(device)
         return
-    data = data.decode('utf-8').split(',') #formats the data into a list of strings
-    try: msg_type, msg_data = int(data[0]), data[1:]
-    except ValueError: print("Invalid message received")
+    data = raw_data.decode('utf-8').split(',') #formats the data into a list of strings
+    try: msg_type, msg_data = int(data[1]), data[2:]
+    except ValueError: print(f"Invalid message received: {data}"); return
     types = {
         1: handle_msg01,
         3: handle_msg03,
@@ -186,17 +189,17 @@ def handle_msg01(msg_data, device):
     for str in msg_data:
         print(str)
     print()
-    send_msg("02,ack 01", device)
+    send_msg(f",02,ack 01\n", device)
 
 def handle_msg03(msg_data, device):
-    send_msg("04,Device requested closing", device)
+    send_msg(f",04,Device requested closing\n", device)
     device["close_flag"]=True
 
 def handle_msg10(msg_data, device):
     name, ccas = msg_data[0], msg_data[1:]
     device["name"] = name
     device["CCA"] = ccas
-    send_msg("11,ack 01", device)
+    send_msg(f",11,ack 01\n", device)
 
 def handle_msg21(msg_data, device):
     print(f"{device['name']} runs configuration {msg_data[0]}")

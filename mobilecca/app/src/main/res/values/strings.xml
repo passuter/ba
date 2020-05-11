@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">Mobile CCA comparison</string>
+    <string name="welcome">Welcome\nTo continue, this app requires root permission.</string>
+    <string name="no_root_error2">App has no root permission</string>
+    <string name="no_root_error1">Could not properly start the app</string>
+    <string name="connection_info_def">Ready to connect</string>
+
+    <!-- Preference Titles -->
+
+    <!-- Messages Preferences -->
+
+    <!-- Sync Preferences -->
+</resources>

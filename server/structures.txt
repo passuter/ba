@@ -1,15 +1,15 @@
-Types of messages
+Types of messages, all messages start with a leading ',', as phone might write control characters first.
 01: Message to be printed by server
 02: Ack of 01
 03: Device requests to close connection
 04: Server informs device that the connection will be terminated. Structure: reason:string
 10: Initialization of a new device. Structure: name:string,CCA_1:string,CCA_2:string,...
 11: Ack of 10
-21: Server sends configuration. Structure:config_name:string,dev_name:string,length:int,trace,IP,PORT,number_of_CCA:int,CCA1,CCA2,...
-22: Ack of 21, Structure: test_name:string
-unused 23: Server sends command to execute a test with a specified configuration.
+20: Server sends configuration. Structure:config_name:string,dev_name:string,length:int,trace,IP,PORT,number_of_CCA:int,CCA1,CCA2,...
+21: Ack of 20, Structure: test_name:string
+unused 22: Server sends command to execute a test with a specified configuration.
     Structure: config_name:string
-unused 24: Ack of 23
+unused 23: Ack of 22
 
 
 

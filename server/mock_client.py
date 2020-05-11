@@ -21,7 +21,7 @@ def handle_msg(data):
         global end_flag
         end_flag = True
     data = data.decode('utf-8').rstrip().split(',') #formatts the data into a list of strings
-    msg_type, msg_data = int(data[0]), data[1:]
+    msg_type, msg_data = int(data[1]), data[2:]
     types = {
         2: handle_msg02,
         4: handle_msg04,
@@ -35,7 +35,7 @@ def handle_msg(data):
 
 def handle_msg02(msg):
     if terminate_self:
-        send_msg.append(bytes("03,", encoding='utf-8'))
+        send_msg.append(bytes(",03,", encoding='utf-8'))
 
 def handle_msg04(msg):
     #server closes connection, mock client terminates
@@ -53,13 +53,13 @@ def handle_msg20(msg):
     addr = (msg[4],int(msg[5]))
     num_cca = int(msg[6])
     ccas = msg[7:7+num_cca]
-    send_msg.append(bytes(f"21,{conf_name}", encoding='utf-8'))
+    send_msg.append(bytes(f",21,{conf_name}", encoding='utf-8'))
     print(f"I received configuration {conf_name}")
     print(f"Length: {length}s, trace: {trace}, Address: {addr}, CCAs: {ccas}\n")
 
 def main():
     
-    send_msg.append(bytes(f"10,{name},CCA_1,CCA_2", encoding='utf-8'))
+    send_msg.append(bytes(f",10,{name},CCA_1,CCA_2", encoding='utf-8'))
 
     conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     conn.connect((HOST, PORT))
