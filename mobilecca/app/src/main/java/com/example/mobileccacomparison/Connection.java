@@ -20,6 +20,7 @@ public class Connection extends Thread{
 
     private ConcurrentLinkedQueue<String> queue;
     private boolean running = true;
+    private RunTest test = null;
 
     private Connection(ConcurrentLinkedQueue<String>q) {
         queue = q;
@@ -27,7 +28,7 @@ public class Connection extends Thread{
 
     /**
      * Sets up and dispatches a Connection thread, which will connect & communicate to the server
-     * @param queue
+     * @param queue queue to communicate with main thread
      */
     public static void connect(ConcurrentLinkedQueue<String> queue) {
         if (c != null) {
@@ -55,7 +56,9 @@ public class Connection extends Thread{
 
     private void close(Socket socket) {
         try {
-            socket.close();
+            if (socket!=null) {
+                socket.close();
+            }
         } catch (IOException e) {
             print_Exception(e);
         }
@@ -101,7 +104,10 @@ public class Connection extends Thread{
             while (running) {
                 try {
                     line = recv.readLine();
-                    handle_msg(line);
+                    String response = handle_msg(line);
+                    if (!response.equals("")) {
+                        send.writeUTF(response);
+                    }
                 } catch (SocketTimeoutException e) {
                     //no message received, nothing to do
                 }
@@ -113,7 +119,12 @@ public class Connection extends Thread{
         close(socket);
     }
 
-    private void handle_msg(String msg) {
+    /**
+     * Reads and reacts to a received message
+     * @param msg
+     * @return response message to be sent back or "" if nothing to send back
+     */
+    private String handle_msg(String msg) {
         String[] msg_split = msg.split(",");
         //read type of message
         int type = Integer.parseInt(msg_split[1]);
@@ -122,18 +133,39 @@ public class Connection extends Thread{
         for (int i = 2; i < msg_split.length; i++) {
             data[i-2] = msg_split[i];
         }
+        String response = "";
         switch (type) {
             case 2: break;
             case 4: running = false; break;
             case 11: queue.offer("Connected to server"); break;
-            case 20: handle_msg20(data); break;
+            case 20: response = handle_msg20(data); break;
             default: queue.offer("Could not handle a received message");
         }
+        return response;
     }
 
-    private void handle_msg20(String[] data) {
-        //TODO implement receiving a test configuration
-        queue.offer("Received Test-configuration " + data[0]);
+    private String handle_msg20(String[] data) {
+        String response;
+        try {
+            String name = data[0];
+            String length = data[2];
+            String ip = data[4];
+            String port = data[5];
+            int number_cca = Integer.parseInt(data[6]);
+            String[] ccas = new String[number_cca];
+            for (int i = 0; i < number_cca; i++) {
+                ccas[i] = data[i + 7];
+            }
+            if (test != null) {
+                throw new RuntimeException("Test is already running");
+            }
+            test = new RunTest(name, length, ip, port, number_cca, ccas);
+            test.start();
+            response = ",21,1"; //write back success
+        } catch (RuntimeException e) {
+            response = ",21,0," + e.toString();
+        }
+        return response;
     }
 
     private void print_Exception(Exception e) {

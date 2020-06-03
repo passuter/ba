@@ -22,10 +22,12 @@ public class MainActivity extends AppCompatActivity {
      */
     public void onCheckRoot(View view) {
         if (Util.check_root()) {
+            init();
             if (Config.init(this)) {
                 Intent intent = new Intent(this, HomeActivity.class);
                 startActivity(intent);
             } else {
+                //no config loaded, go directly to ChangeConfig
                 Intent intent = new Intent(this, ChangeConfigActivity.class);
                 startActivity(intent);
             }
@@ -33,5 +35,12 @@ public class MainActivity extends AppCompatActivity {
             Intent intent = new Intent(this, NoRootActivity.class);
             startActivity(intent);
         }
+    }
+
+    private void init() {
+        Util.init(this);
+        Util.copyIperf3(this);
+        Util.copyTCPDump(this);
+        Util.copyAssets("iperf3.XXXXXX", this);
     }
 }

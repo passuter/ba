@@ -29,7 +29,7 @@ public class HomeActivity extends AppCompatActivity {
 
         if (q == null) {
             q = new ConcurrentLinkedQueue<>();
-            set_info("Ready to connect", "CCA0: " + Config.current.cca[0]);
+            set_info("Ready to connect", "");
         }
     }
 
@@ -66,5 +66,9 @@ public class HomeActivity extends AppCompatActivity {
         display_msg = txt;
         TextView info = findViewById(R.id.connectionInfo);
         info.setText(insert + txt);
+    }
+
+    public void onTest(View view) {
+        startActivity(new Intent(this, TestActivity.class));
     }
 }
