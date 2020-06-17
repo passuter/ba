@@ -21,6 +21,13 @@ public class Util {
 
     public static final int MAX_PORT = 65535;
     public static String appDir; //files directory of the app
+    public static Context cont;
+
+
+    public static void init(Context context) {
+        appDir = context.getFilesDir().getPath();
+        cont = context;
+    }
 
     /**
      * Runs a command on a su shell
@@ -131,6 +138,24 @@ public class Util {
     }
 
     /**
+     * Writes an array of strings into a single string using a separator
+     * @param arr
+     * @param separator
+     * @return
+     */
+    public static String stringArray_toString(String[] arr, String separator) {
+        if (arr == null) {
+            return "";
+        }
+
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < arr.length; i++) {
+            sb.append(arr[i]).append(separator);
+        }
+        return sb.toString();
+    }
+
+    /**
      * copies a file from the assets into the apps file directory and marks it as executable
      * @param filename
      * @param context
@@ -191,7 +216,4 @@ public class Util {
 
     }
 
-    public static void init(Context context) {
-        appDir = context.getFilesDir().getPath();
-    }
 }

@@ -161,8 +161,12 @@ public class Connection extends Thread{
             }
             test = new RunTest(name, length, ip, port, number_cca, ccas);
             test.start();
-            response = ",21,1"; //write back success
-        } catch (RuntimeException e) {
+            test.join();
+            String num_files = String.valueOf(test.results_files.length);
+            String file_res = Util.stringArray_toString(test.results_files, ",");
+            test = null; //test completed, can be removed
+            response = ",21," + num_files + "," + file_res; //write back success
+        } catch (RuntimeException | InterruptedException e) {
             response = ",21,0," + e.toString();
         }
         return response;

@@ -15,6 +15,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.TimeoutException;
 
 
 public class TestActivity extends AppCompatActivity {
@@ -33,9 +34,29 @@ public class TestActivity extends AppCompatActivity {
     }
 
     public void onTest2(View view) {
-        String res = String.valueOf(Util.getBatteryLevel(this));
-        set_txt(res);
-}
+        RunTest t = new RunTest("Base", "3", "192.168.1.127", "5201", 2, new String[]{"reno", "cubic"});
+        set_txt("Starting test run");
+        t.start();
+        int time = 0;
+        boolean running = true;
+        try {
+            t.join();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        if (t.results_files == null) {
+            set_txt("Finished, no results received, debug: " + t.debug);
+        } else {
+            StringBuilder sb = new StringBuilder();
+            sb.append("Test has concluded. Results at:\n");
+            for (int i = 0; i < t.results_files.length; i++) {
+                sb.append(t.results_files[i]).append("\n");
+            }
+            sb.append("Debug: ").append(t.debug);
+            set_txt(sb.toString());
+        }
+    }
 
     public String runIperf(String ip, String port) {
         String appFileDirectory = getFilesDir().getPath();

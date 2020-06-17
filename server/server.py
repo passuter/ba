@@ -202,7 +202,7 @@ def handle_msg10(msg_data, device):
     send_msg(f",11,ack 01\n", device)
 
 def handle_msg21(msg_data, device):
-    print(f"{device['name']} runs configuration {msg_data[0]}")
+    print(f"{device['name']} returned from a test run with:\n{msg_data}")
 
 def send_msg(msg, device):
     """
