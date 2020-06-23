@@ -7,8 +7,6 @@ import android.os.Bundle;
 import android.view.View;
 import android.widget.TextView;
 
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class HomeActivity extends AppCompatActivity {
@@ -39,7 +37,11 @@ public class HomeActivity extends AppCompatActivity {
     }
 
     public void onConnect(View view) {
-        //TODO implement onConnect
+        if (!Config.isValid()) {
+            q.offer("No configuration set, cannot connect to server");
+            return;
+        }
+
         Connection.connect(q);
     }
 

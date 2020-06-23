@@ -36,6 +36,7 @@ dev_config={
 	"CCAs":string list
 }
 
+
 Configuration structure:
 name:string, Version 1
 Server_settings:tbd

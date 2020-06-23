@@ -96,7 +96,7 @@ public class Connection extends Thread{
             send = new DataOutputStream(socket.getOutputStream());
             recv = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             socket.setSoTimeout(500);
-            queue.offer("Socket established"); //debug only
+            //queue.offer("Socket established"); //debug only
 
             String line = "";
             send.writeUTF(",10," + Config.asString());

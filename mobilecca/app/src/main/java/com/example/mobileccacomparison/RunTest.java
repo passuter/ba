@@ -56,7 +56,7 @@ public class RunTest extends Thread {
     public void process_Data(String[] iperf_res) {
         //TODO better data processing
         String iperf_res_file_tmp = "iperf_res.txt";
-        String iperf_res_file = "/sdcard/iperf_res.txt";
+        String iperf_res_file = "/sdcard/" + Config.current.name + "_iperf_res.txt";
         try {
             FileOutputStream fOut = Util.cont.openFileOutput(iperf_res_file_tmp, Context.MODE_PRIVATE);
             OutputStreamWriter osw = new OutputStreamWriter(fOut);
@@ -90,7 +90,7 @@ public class RunTest extends Thread {
         String tcpdump_save;
         public RunTCPdump(String appFileDirectory, String length, int runNumber) {
             this.appFileDirectory = appFileDirectory;
-            tcpdump_save = "/sdcard/dump_run" + runNumber + ".pcap";
+            tcpdump_save = "/sdcard/" + Config.current.name + "_dump_run" + runNumber + ".pcap";
             //length of tcpdump specified according to https://stackoverflow.com/questions/25731643/how-to-schedule-tcpdump-to-run-for-a-specific-period-of-time
             tcp_cmd = "./tcpdump -i any -s 0 -G " + length + " -W 1 -w " + tcpdump_save;
 

@@ -39,6 +39,14 @@ public class Config {
         return !default_name.equals(current.name);
     }
 
+    /**
+     * Checks wheter there is a valid current configuration
+     * @return
+     */
+    public static boolean isValid() {
+        return !(current == null || current.name == default_name);
+    }
+
 
     /**
      * Loads a configuration from the config.txt file

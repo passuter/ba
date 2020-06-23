@@ -5,8 +5,9 @@ import time
 import queue
 
 import server_frontend
+from data_structures import Device, Config
 
-HOST = ''#'127.0.0.1'  # Standard loopback interface address (localhost)
+HOST = ''#'127.0.0.1' 
 PORT = 65432        # Port to listen on (non-privileged ports are > 1023)
 
 socket_list = [] #list with all active sockets
@@ -51,14 +52,7 @@ def server_loop():
                 client, addr = s.accept()
                 socket_list.append(client)
                 
-                device = {
-                    "socket": client,
-                    "addr": addr,
-                    "name": "Not_initialized",
-                    "CCA": [],
-                    "write_buff": [], #messages to be sent as strings
-                    "close_flag": False #flag to indicate wheter socket should be closed
-                }
+                device = Device(client, addr)
                 devices.append(device)
             else:
                 #potentially reads multiple messages, in practice only one message arrives in read intervall
@@ -72,21 +66,19 @@ def server_loop():
                 raise RuntimeError("Cannot write to server_socket")
             else:
                 device = find_device_by_socket(s)
-                msg = device["write_buff"][0]
-                device["write_buff"].remove(msg)
+                msg = device.write_buff[0]
+                device.write_buff.remove(msg)
                 msg = bytes(msg, encoding='utf-8')
                 s.sendall(msg)
-                if not device["write_buff"]:
+                if not device.write_buff:
                     #remove the device from the write_list if no more message is waiting to be sent
                     write_list.remove(s)
 
                 #close connection if all messages have been sent
-                if device["close_flag"] and (not device["write_buff"]):
+                if device.close_flag and (not device.write_buff):
                     remove_device(device)
 
         #TODO loop over in_error
-        #or d in devices:
-            #print(f"{d['name']}: {d['write_buff']}")
 
         update()
 
@@ -121,12 +113,13 @@ def shutdown():
     shutdown_flag = True
     for d in devices:
         send_msg(f",04,Server shutting down\n", d)
-        d["close_flag"]=True
+        d.close_flag=True
 
-def run_conf(conf:dict):
-    name = conf['name']
-    for dev_conf in conf['dev_configs']:
-        d = server_frontend.get_dev_by_name(devices, dev_conf['name'])
+def run_conf(conf:Config):
+    name = conf.name
+    print(f"Running test {name}\n")
+    for dev_conf in conf.dev_configs:
+        d = server_frontend.get_dev_by_name(devices, dev_conf.name)
         msg = f",20,{name}," + server_frontend.dev_conf_to_str(dev_conf) + f"\n"
         send_msg(msg, d)
 
@@ -135,7 +128,7 @@ def find_device_by_socket(s):
     Finds the device belonging to the socket s
     """
     for d in devices:
-        if d["socket"] == s:
+        if d.socket == s:
             return d
     raise RuntimeError("Tried to find Invalid socket")
 
@@ -144,24 +137,24 @@ def find_device_by_name(name):
     Finds the device belonging to the name
     """
     for d in devices:
-        if d["name"] == name:
+        if d.name == name:
             return d
     raise RuntimeError(f"Could not find device with name {name}")
 
-def remove_device(device):
+def remove_device(device:Device):
     """
     Removes device from all queues and closes the corresponding socket
     """
     try: devices.remove(device)
-    except ValueError: print("Cannot remove {0}, device not in device list".format(device["name"]))
-    s = device["socket"]
+    except ValueError: print(f"Cannot remove {device.name}, device not in device list")
+    s = device.socket
     try: write_list.remove(s)
     except ValueError: pass
     try: socket_list.remove(s)
     except ValueError: pass
     s.close()
 
-def handle_msg(raw_data, device):
+def handle_msg(raw_data, device:Device):
     """
     Reads a received messages. It first splits the msg into a list of strings, reads which type of msg it is
     and then calls the function handling this type. To view the different types of messages, see structures.txt
@@ -184,33 +177,33 @@ def handle_msg(raw_data, device):
     except KeyError:
         print(f"Invalid msg_type {msg_type}")
     
-def handle_msg01(msg_data, device):
-    print(f"{device['name']} writes")
+def handle_msg01(msg_data, device:Device):
+    print(f"{device.name} writes")
     for str in msg_data:
         print(str)
     print()
     send_msg(f",02,ack 01\n", device)
 
-def handle_msg03(msg_data, device):
+def handle_msg03(msg_data, device:Device):
     send_msg(f",04,Device requested closing\n", device)
-    device["close_flag"]=True
+    device.close_flag=True
 
-def handle_msg10(msg_data, device):
+def handle_msg10(msg_data, device:Device):
     name, ccas = msg_data[0], msg_data[1:]
-    device["name"] = name
-    device["CCA"] = ccas
+    device.name = name
+    device.ccas = ccas
     send_msg(f",11,ack 01\n", device)
 
 def handle_msg21(msg_data, device):
-    print(f"{device['name']} returned from a test run with:\n{msg_data}")
+    print(f"{device.name} returned from a test run with:\n{msg_data}")
 
 def send_msg(msg, device):
     """
     send a message by adding it to the write_buff & adding the socket to the write_list
     """
-    device["write_buff"].append(msg)
-    if write_list.count(device["socket"]) == 0:
-        write_list.append(device["socket"])
+    device.write_buff.append(msg)
+    if write_list.count(device.socket) == 0:
+        write_list.append(device.socket)
     else: pass #this socket is already in the write_list, don't add it again
 
 def main():
