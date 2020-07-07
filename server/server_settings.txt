@@ -1,0 +1,1 @@
+D:/PascalS/Documents/BA/server/tmp/info.txt,eth0

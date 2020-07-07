@@ -48,14 +48,13 @@ def handle_msg11(msg):
 
 def handle_msg20(msg):
     conf_name = msg[0]
-    length = int(msg[2])
-    trace = msg[3]
-    addr = (msg[4],int(msg[5]))
-    num_cca = int(msg[6])
-    ccas = msg[7:7+num_cca]
+    length = int(msg[1])
+    addr = (msg[2],int(msg[3]))
+    num_cca = int(msg[4])
+    ccas = msg[5:5+num_cca]
     send_msg.append(bytes(f",21,{conf_name}", encoding='utf-8'))
     print(f"I received configuration {conf_name}")
-    print(f"Length: {length}s, trace: {trace}, Address: {addr}, CCAs: {ccas}\n")
+    print(f"Length: {length}s, Address: {addr}, CCAs: {ccas}\n")
 
 def main():
     

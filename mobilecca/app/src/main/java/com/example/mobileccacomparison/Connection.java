@@ -148,13 +148,13 @@ public class Connection extends Thread{
         String response;
         try {
             String name = data[0];
-            String length = data[2];
-            String ip = data[4];
-            String port = data[5];
-            int number_cca = Integer.parseInt(data[6]);
+            String length = data[1];
+            String ip = data[2];
+            String port = data[3];
+            int number_cca = Integer.parseInt(data[4]);
             String[] ccas = new String[number_cca];
             for (int i = 0; i < number_cca; i++) {
-                ccas[i] = data[i + 7];
+                ccas[i] = data[i + 5];
             }
             if (test != null) {
                 throw new RuntimeException("Test is already running");

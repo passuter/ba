@@ -4,7 +4,7 @@ from tkinter import *
 from tkinter import filedialog
 import socket
 
-import server, iperf_server
+import server, iperf_server, trace_worker
 from data_structures import *
 
 #Queues for inter thread communication
@@ -224,6 +224,7 @@ def close_and_call(to_close, foo):
 def shutdown():
     if signal_queue: signal_queue.put(1)
     save_settings()
+    iperf_server.clear_state()
     quit()
 
 def call2(f1, f2):
@@ -240,7 +241,7 @@ def get_dev_by_name(dev_list:list, name):
     Returns None if not found
     """
     for d in dev_list:
-        if d.name== name: return d
+        if d.name == name: return d
     return None 
 
 def save_settings():
@@ -317,14 +318,17 @@ class New_config_frame(Frame):
 
     def ok(self):
         conf_name= self.e.get()
-        loc = filedialog.asksaveasfilename(title = "Save as", filetypes = (("text files","*.txt"),("all files","*.*")))
+        loc = filedialog.asksaveasfilename(title = "Save as", defaultextension='.txt', filetypes = (("text files","*.txt"),("all files","*.*")))
         if conf_name == '' or loc == '': return
-        config = Config(conf_name, loc, 0, [])
+        config = Config(conf_name, (loc+".txt"), 0, [])
         global active_config
         active_config = config
         close_and_call(self, lambda: mod_config())
 
 class Mod_config_frame(Frame):
+    """
+    Frame to modify the currently selected configuration
+    """
     def __init__(self, parent):
         Frame.__init__(self, parent)
         top_lbl = Label(self, text=f"Modify configuration \"{active_config.name}\"")
@@ -376,7 +380,7 @@ class Mod_config_frame(Frame):
 
         count = 0 #counts number of CCAs displayed
         max_displ = 5
-        text = f"Device Name: {dev_conf.name}\nRuntime: {dev_conf.length}s\nIperf Address: {dev_conf.addr}\nTrace: {dev_conf.trace}\nCCAs (shows maximal {max_displ}):"
+        text = f"Device Name: {dev_conf.name}\nRuntime: {dev_conf.length}s\nIperf Address: {dev_conf.addr}\nTrace: {dev_conf.trace_name}\nCCAs (shows maximal {max_displ}):"
         for cca in dev_conf.ccas:
             count += 1
             if count > max_displ: break
@@ -466,7 +470,7 @@ class Mod_dev_config_frame(Frame):
             ccas.append(self.lb.get(i))
         
         if correct_values:
-            dev_config = Dev_config(self.dev_name, length, "default", (ip, port), len(ccas), ccas)
+            dev_config = Dev_config(self.dev_name, length, "50", None, None, (ip, port), len(ccas), ccas)
             if is_valid_dev_config(dev_config, print_error=print): self.ok(dev_config)
             else: pass #some entry was invalid, nothing to do
         else: pass #some entry was invalid, nothing to do
@@ -487,10 +491,9 @@ class Mod_dev_config_frame(Frame):
         close_and_call(self, mod_config)
 
 class Run_config_frame(Frame):
-    def __init__(self, parent, state:State):
+    def __init__(self, parent):
         Frame.__init__(self, parent, width=window_width, height=window_height)
         self.pack(fill=BOTH)
-        self.state = state
         #TODO report setup progression
 
         bot_frame = Frame(self)
@@ -538,6 +541,7 @@ def new_conf():
     """
     Ask for name & location of a new configuration
     """
+    iperf_server.clear_state()
     frame = New_config_frame(root)
     frame.pack()
 
@@ -547,6 +551,7 @@ def mod_config():
     """
     if active_config == None: home()
     else:
+        iperf_server.clear_state()
         frame = Mod_config_frame(root)
         frame.pack()
 
@@ -573,7 +578,7 @@ def add_dev_config2():
     if index == -1: mod_config() #no device selected, return to modify configuration screen
     else:
         dev = devices[index]
-        conf = Dev_config(dev.name, 0, 'none', ('0.0.0.0', 0), 0, [])
+        conf = Dev_config(dev.name, 0, "50", None, None, (server_settings.ip, 0), 0, [])
         mod_dev_config(dev, conf)
 
 def start_run_config():
@@ -589,14 +594,14 @@ def start_run_config():
     else:
         home() #cannot run invalid configuration
 
-def run_config(state=None):
+def run_config():
     """
     This function tries to setup the iperf server.
-    state holds all values about the currrent progress of the setup
+    state 
     """
-    state = iperf_server.setup(state)
+    iperf_server.setup()
     #TODO try to set up server
-    Run_config_frame(root, state)
+    Run_config_frame(root)
 
 def save_conf():
     """
@@ -604,7 +609,7 @@ def save_conf():
     """
     f = open(active_config.location, 'w')
     #txt = f"{active_config['name']}, Version 1\nServer_settings:tbd\nNumber_of_devices: {active_config['num_of_dev']}\n"
-    txt = f"{active_config.name}, Version 2\nNumber_of_devices: {active_config.num_of_dev}\n"
+    txt = f"{active_config.name}, Version 3\nNumber_of_devices: {active_config.num_of_dev}\n"
     for d in active_config.dev_configs:
         txt += dev_conf_to_str(d) + f"\n"
     f.write(txt)
@@ -614,7 +619,7 @@ def dev_conf_to_str(dev_conf:Dev_config):
     Writes the device configuration into a string (ends it with newline)
     """
     ip, port = dev_conf.addr
-    txt = f"{dev_conf.name},{dev_conf.length},{dev_conf.trace},{ip},{port},{dev_conf.number_of_cca}"
+    txt = f"{dev_conf.name},{dev_conf.length},{dev_conf.rate},{dev_conf.trace_name},{dev_conf.trace_handler},{ip},{port},{dev_conf.number_of_cca}"
     for cca in dev_conf.ccas:
         txt +=f",{cca}"
     return txt
@@ -627,15 +632,17 @@ def load_conf():
     f_loc = filedialog.askopenfilename(title = "Select file", filetypes = (("text files","*.txt"),("all files","*.*")))
     if f_loc == '': home() #no file was selected
     else:
+        iperf_server.clear_state()
         f = open(f_loc, mode='r')
         line_1 = f.readline().split(',')
         try:
             name, version = line_1[0], int(line_1[1].split()[1]) #reads name & version number of the configuration file
             version_handlers = {
-                1: lambda: load_v1(f, name, f_loc),
-                2: lambda: load_v2(f, name, f_loc),
+                1: load_v1,
+                2: load_v2,
+                3: load_v3,
             }
-            try: version_handlers[version]() #calls the handler belonging to the version number
+            try: version_handlers[version](f, name, f_loc) #calls the handler belonging to the version number
             except KeyError: 
                 print("Invalid configuration version")
         except IndexError: print("Could not load configuration, reading of name and version failed")
@@ -661,7 +668,7 @@ def load_v1(f, name, f_loc):
         ccas = []
         for j in range(num_cca):
             ccas.append(l[6+j])
-        dev_conf = Dev_config(dev_name, length, trace, addr, num_cca, ccas)
+        dev_conf = Dev_config(dev_name, length, "50", None, None, addr, num_cca, ccas)
         dev_list.append(dev_conf)
     conf = Config(name, f_loc, num_of_dev, dev_list)
     global active_config
@@ -684,11 +691,45 @@ def load_v2(f, name, f_loc):
         ccas = []
         for j in range(num_cca):
             ccas.append(l[6+j])
-        dev_conf = Dev_config(dev_name, length, trace, addr, num_cca, ccas)
+        dev_conf = Dev_config(dev_name, length, "50", None, None, addr, num_cca, ccas)
         dev_list.append(dev_conf)
     conf = Config(name, f_loc, num_of_dev, dev_list)
     global active_config
     active_config = conf
+
+def load_v3(f, name, f_loc):
+    num_of_dev = int(f.readline().split()[1])
+    dev_list = []
+    for i in range(num_of_dev):
+        l = f.readline()
+        if l == '': #file ended early
+            print("Configuration file corrupted: Less devices than specified")
+            home()
+        l = l.rstrip().split(',') #remove tailing newline & split by ','
+        dev_name = l[0]
+        length = int(l[1])
+        rate = l[2]
+        trace_name = l[3]
+        trace_name = to_none(trace_name)
+        trace_handler = l[4]
+        trace_handler = to_none(trace_handler)
+        addr = (l[5], int(l[6]))
+        num_cca = int(l[7])
+        ccas = []
+        for j in range(num_cca):
+            ccas.append(l[8+j])
+        dev_conf = Dev_config(dev_name, length, rate, trace_name, trace_handler, addr, num_cca, ccas)
+        dev_list.append(dev_conf)
+    conf = Config(name, f_loc, num_of_dev, dev_list)
+    global active_config
+    active_config = conf
+
+def to_none(string:str):
+    if string == 'None':
+        return None
+    else:
+        return string
+
 
 def is_valid_config(print_error=None):
     """
@@ -780,6 +821,7 @@ def main(conf_queue:queue.Queue, dvice_queue:queue.Queue, signl_queue:queue.Queu
     device_queue = dvice_queue
     signal_queue = signl_queue
     root.protocol("WM_DELETE_WINDOW", shutdown) #closing the window also triggers a shutdown of the server
+    trace_worker.init()
     load_settings()
     home()
     #test()

@@ -5,7 +5,7 @@ import time
 import queue
 
 import server_frontend
-from data_structures import Device, Config
+from data_structures import Device, Config, Dev_config
 
 HOST = ''#'127.0.0.1' 
 PORT = 65432        # Port to listen on (non-privileged ports are > 1023)
@@ -120,8 +120,19 @@ def run_conf(conf:Config):
     print(f"Running test {name}\n")
     for dev_conf in conf.dev_configs:
         d = server_frontend.get_dev_by_name(devices, dev_conf.name)
-        msg = f",20,{name}," + server_frontend.dev_conf_to_str(dev_conf) + f"\n"
+        conf_to_send = dev_conf_to_str(dev_conf)
+        msg = f",20,{name},{conf_to_send}\n"
         send_msg(msg, d)
+
+def dev_conf_to_str(dev_conf:Dev_config):
+    """
+    Writes the device configuration into a string (ends it with newline), ignores traces & name of the device
+    """
+    ip, port = dev_conf.addr
+    txt = f"{dev_conf.length},{ip},{port},{dev_conf.number_of_cca}"
+    for cca in dev_conf.ccas:
+        txt +=f",{cca}"
+    return txt
 
 def find_device_by_socket(s):  
     """

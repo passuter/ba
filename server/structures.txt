@@ -11,36 +11,9 @@ Structure: number_files:int,file1:string,file2:string,...
 
 
 
-device = {
-                    "socket": client,
-                    "addr": addr,
-                    "name": "Not_initialized",
-                    "CCA": [],
-                    "write_buff": [],
-                    "last_flag": False
-                }
-
-config={
-            "name": string,
-            "location": string,
-            "num_of_dev": int,
-            "dev_configs": dev_config list
-        }
-
-dev_config={
-	"name":string,
-	"length":int,
-	"trace": tbd,
-	"addr": (IP, PORT),
-	"number_of_CCA":int,
-	"CCAs":string list
-}
-
-
-Configuration structure:
-name:string, Version 1
-Server_settings:tbd
+Configuration savefile structure:
+name:string, Version 3
 Number_of_devices num:int
-dev_name:string,length:int,trace,IP,PORT,number_of_CCA:int,CCA1,CCA2,...
-dev_name:string,length:int,trace,IP,PORT,number_of_CCA:int,CCA1,CCA2,...
+dev_name:string,length:int,trace_name,trace_handler,IP,PORT,number_of_CCA:int,CCA1,CCA2,...
+dev_name:string,length:int,trace_name,trace_handler,IP,PORT,number_of_CCA:int,CCA1,CCA2,...
 ...
