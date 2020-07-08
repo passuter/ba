@@ -1,5 +1,6 @@
 import socket
 import select
+from time import sleep
 
 """
 This mock client is supposed to test the functionalities of the server.
@@ -52,9 +53,10 @@ def handle_msg20(msg):
     addr = (msg[2],int(msg[3]))
     num_cca = int(msg[4])
     ccas = msg[5:5+num_cca]
-    send_msg.append(bytes(f",21,{conf_name}", encoding='utf-8'))
     print(f"I received configuration {conf_name}")
     print(f"Length: {length}s, Address: {addr}, CCAs: {ccas}\n")
+    sleep(2)
+    send_msg.append(bytes(f",21,{conf_name}", encoding='utf-8'))
 
 def main():
     

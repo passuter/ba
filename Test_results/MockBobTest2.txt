@@ -1,0 +1,3 @@
+BobMock2, Version 3
+Number_of_devices: 1
+Bob,12,40,sample.bin,bin,1.1.1.1,5200,1,CCA_1

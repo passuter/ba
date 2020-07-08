@@ -55,12 +55,22 @@ public class RunTest extends Thread {
      */
     public void process_Data(String[] iperf_res) {
         //TODO better data processing
+
+        results_files = new String[tmp_results_files.length + 1];
+        System.arraycopy(tmp_results_files, 0, results_files, 1, tmp_results_files.length);
+
         String iperf_res_file_tmp = "iperf_res.txt";
         String iperf_res_file = "/sdcard/" + Config.current.name + "_iperf_res.txt";
+        results_files[0] = iperf_res_file;
         try {
             FileOutputStream fOut = Util.cont.openFileOutput(iperf_res_file_tmp, Context.MODE_PRIVATE);
             OutputStreamWriter osw = new OutputStreamWriter(fOut);
             osw.write(Util.stringArray_toString(iperf_res, "\n"));
+            osw.close();
+            fOut = Util.cont.openFileOutput("res_id.txt", Context.MODE_PRIVATE);
+            osw = new OutputStreamWriter(fOut);
+            String txt = Config.current.name + "," + name + "\n" + Util.stringArray_toString(results_files, ",");
+            osw.write(txt);
             osw.close();
         } catch (FileNotFoundException e) {
             debug = "1, " + e.toString();
@@ -70,12 +80,8 @@ public class RunTest extends Thread {
             return;
         }
 
-        Util.run_cmds(new String[]{"cd " + Util.appDir, "cp " + iperf_res_file_tmp + " " + iperf_res_file}, false);
-        results_files = new String[tmp_results_files.length + 1];
-        results_files[0] = iperf_res_file;
-        for (int i = 1; i <= tmp_results_files.length; i++) {
-            results_files[i] = tmp_results_files[i-1];
-        }
+        String[] copy_cmds = new String[]{"cd " + Util.appDir, "cp " + iperf_res_file_tmp + " " + iperf_res_file, "cp res_id.txt /sdcard/res_id.txt"};
+        Util.run_cmds(copy_cmds, false);
 
     }
 

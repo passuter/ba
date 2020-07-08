@@ -49,6 +49,8 @@ def stop_emulating():
     global running
     running = False
     netem_thread.join(5)
+    #remove the rules again
+    execute(f"tc qdisc del dev {server_frontend.server_settings.network_dev} handle 1: root htb")
     clear_setup()
     
 def netem_emulator(flow_mappings):
@@ -94,7 +96,7 @@ def generate_netem_cmd():
     if server_frontend.server_settings.network_dev != "":
         network_dev = server_frontend.server_settings.network_dev
     #replace default root qdisc 
-    cmds = [f"sudo tc qdisc add dev {network_dev} handle 1: root htb"]
+    cmds = [f"tc qdisc add dev {network_dev} handle 1: root htb"]
     
     id_mapping = []
     i = 0
@@ -102,12 +104,12 @@ def generate_netem_cmd():
         if i < 10: flow_id = f"1:10{i}"
         else: flow_id = f"1:1{i}"
         #add a class for each device and limit it to a high default value
-        cmds.append(f"sudo tc class add dev {network_dev} parent 1: classid {flow_id} htb 10Gbps") #set max value
+        cmds.append(f"tc class add dev {network_dev} parent 1: classid {flow_id} htb 10Gbps") #set max value
         #add a def values for that class
-        cmds.append(f"sudo tc qdisc add dev {network_dev} parent {flow_id} handle {i}: netem delay 0 loss 0 rate 10Gbps")
+        cmds.append(f"tc qdisc add dev {network_dev} parent {flow_id} handle {i}: netem delay 0 loss 0 rate 10Gbps")
         #add a filter to match this device with the class
         device_ip, _ = server_frontend.get_dev_by_name(server_frontend.devices, d.name).addr
-        cmds.append(f"sudo tc filter add dev {network_dev} parent 1: protocol ip prio 1 u32 match ip src {device_ip}/32 flowid {flow_id}")
+        cmds.append(f"tc filter add dev {network_dev} parent 1: protocol ip prio 1 u32 match ip src {device_ip}/32 flowid {flow_id}")
         id_mapping.append((d.trace_name, flow_id))
 
     return cmds, id_mapping
@@ -145,6 +147,7 @@ def clear_setup():
     """
     try: shutil.rmtree(tmp_dir) #delete all temporary files
     except OSError: pass #print_error(["Error when deleting tmp dir"]) #debug only
-    global netem_thread, traces
+    global netem_thread, traces, running
     netem_thread = None
     traces = dict()
+    running = False

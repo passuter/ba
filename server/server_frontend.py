@@ -18,11 +18,13 @@ active_config:Config = None
 server_settings:Server_settings = Server_settings()
 devices = []
 index=-1 #index to store which device is currently selected. get the selected device with devices[index]
+state:State = None
 
 #global parameters
 window_width = 600
 window_height = 600
 default_btn_width = 20
+print_error = print #global function for reporting errors
 
 class Separator(Frame):
     def __init__(self, parent, height=10):
@@ -224,7 +226,7 @@ def close_and_call(to_close, foo):
 def shutdown():
     if signal_queue: signal_queue.put(1)
     save_settings()
-    iperf_server.clear_state()
+    iperf_server.clear_setup()
     quit()
 
 def call2(f1, f2):
@@ -288,7 +290,7 @@ class Config_frame(Frame):
 
         sep = Separator(self)
         btn_run = Button(self, text="RUN this configuration", fg="green", width=default_btn_width)
-        btn_run['command']= lambda: close_and_call(parent, start_run_config)
+        btn_run['command']= lambda: close_and_call(parent, start_run)
 
 
         lbl1.pack(side=TOP, fill=X)
@@ -423,6 +425,7 @@ class Mod_dev_config_frame(Frame):
         self.length_entry.grid(row=0, column=1)
         self.length_entry.insert(END, device_config.length)
         trace_lbl = Label(lhs, text="Placeholder to select trace")
+        #TODO select trace gui
         trace_lbl.grid(row=1)
         ip, port = device_config.addr
         ip_lbl = Label(lhs, text="Enter ip of iperf server")
@@ -471,7 +474,7 @@ class Mod_dev_config_frame(Frame):
         
         if correct_values:
             dev_config = Dev_config(self.dev_name, length, "50", None, None, (ip, port), len(ccas), ccas)
-            if is_valid_dev_config(dev_config, print_error=print): self.ok(dev_config)
+            if is_valid_dev_config(dev_config): self.ok(dev_config)
             else: pass #some entry was invalid, nothing to do
         else: pass #some entry was invalid, nothing to do
 
@@ -494,19 +497,75 @@ class Run_config_frame(Frame):
     def __init__(self, parent):
         Frame.__init__(self, parent, width=window_width, height=window_height)
         self.pack(fill=BOTH)
-        #TODO report setup progression
+        run_info = f"Test name: {active_config.name}"
+        lbl_top = Label(self, text=run_info)
+        lbl_top.pack(side=TOP)
 
-        bot_frame = Frame(self)
-        bot_frame.pack(side=BOTTOM)
-        back_btn = Back_btn(bot_frame, lambda: close_and_call(self, home))
-        back_btn.pack(side=LEFT)
-        run_btn = Button(bot_frame, text="RUN", fg="green", command=self.run_conf, width=default_btn_width)
-        run_btn.pack(side=RIGHT)
+        lbl_progress = Label(self, text=state.print_status())
+        lbl_progress.pack(side=TOP)
+
+        if not state.started:
+            run_btn = Button(self, text="RUN", fg="green", command=self.run_conf, width=default_btn_width)
+            run_btn.pack()
+
+        if state.pull_complete and not state.all_finished_stage(1):
+            lbl = Label(self, text="Not all data was found, see above")
+            lbl.pack()
+            retry_btn = Button(self, text="RETRY", command=self.retry, width=default_btn_width)
+            retry_btn.pack()
+
+        if state.finished:
+            ok_btn = Ok_btn(self, self.close_action)
+            ok_btn.pack()
+        else:
+            update_btn = Button(self, text="UPDATE", fg="green", command=self.update, width=default_btn_width)
+            update_btn.pack()
+            back_btn = Back_btn(self, self.close_action)
+            back_btn.pack()
         
+    def update(self):
+        if state.all_finished_stage(0):
+            state.finished=True
+        close_and_call(self, view_run_progress)
+    
     def run_conf(self):
         config_queue.put(active_config.copy())
-        close_and_call(self, lambda: hi_foo(f"Running test \"{active_config.name}\""))
+        state.started=True
+        close_and_call(self, view_run_progress)
+
+    def close_action(self):
+        if (not state.started) or state.finished:
+            iperf_server.clear_setup()
+            close_and_call(self, home)
+        else:
+            close_and_call(self, Ask_abort_frame)
     
+    def retry(self):
+        server.collect_data(state)
+        self.update()
+
+class Ask_abort_frame(Frame):
+    def __init__(self):
+        Frame.__init__(self, root, width=window_width, height=window_height)
+        self.pack(fill=BOTH)
+        lbl = Label(self, text=f"Test has not yet completed.\nAre you sure you want to cancel?")
+        lbl.pack(side=TOP)
+        bot_frame = Frame(self)
+        bot_frame.pack(side=BOTTOM)
+        n_btn = Button(bot_frame, text="NO", fg="red", command=self.no, width=default_btn_width)
+        n_btn.pack(side=LEFT)
+        y_btn = Button(bot_frame, text="YES", fg="green", command=self.yes, width=default_btn_width)
+        y_btn.pack(side=RIGHT)
+
+    def no(self):
+        close_and_call(self, view_run_progress)
+    
+    def yes(self):
+        iperf_server.clear_setup()
+        signal_queue.put(3)
+        close_and_call(self, home)
+
+"""    
 class Ask_sudo_frame(Frame):
     def __init__(self, parent):
         Frame.__init__(self, parent, width=window_width, height=window_height)
@@ -530,18 +589,17 @@ class Ask_sudo_frame(Frame):
             return
         else:
             server_settings.sudo_pw = password
-            close_and_call(self, run_config)
+            close_and_call(self, view_run_progress)
 
     def without(self):
         server_settings.sudo_pw = None
-        close_and_call(self, run_config)
-
+        close_and_call(self, view_run_progress)
+"""
 
 def new_conf():
     """
     Ask for name & location of a new configuration
     """
-    iperf_server.clear_state()
     frame = New_config_frame(root)
     frame.pack()
 
@@ -551,7 +609,6 @@ def mod_config():
     """
     if active_config == None: home()
     else:
-        iperf_server.clear_state()
         frame = Mod_config_frame(root)
         frame.pack()
 
@@ -581,26 +638,26 @@ def add_dev_config2():
         conf = Dev_config(dev.name, 0, "50", None, None, (server_settings.ip, 0), 0, [])
         mod_dev_config(dev, conf)
 
-def start_run_config():
+def start_run():
     """
     Called when user clicks on 'Run this configuration' on the home window.
-    Checks if the configuration is valid and then prompts for sudo password or goes to run_config
+    Checks if the configuration is valid and then starts the test run and goes to view_run_progress
     """
-    if is_valid_config(print_error=print):
-        if server_settings.sudo_pw == None:
-            Ask_sudo_frame(root)
+    if is_valid_config():
+        if iperf_server.setup():
+            global state
+            state = State(active_config)
+            view_run_progress()
         else:
-            run_config()
+            print("Could not setup the iperf server")
+            home()
     else:
         home() #cannot run invalid configuration
 
-def run_config():
+def view_run_progress():
     """
-    This function tries to setup the iperf server.
-    state 
+    Show overview of the current run
     """
-    iperf_server.setup()
-    #TODO try to set up server
     Run_config_frame(root)
 
 def save_conf():
@@ -632,7 +689,6 @@ def load_conf():
     f_loc = filedialog.askopenfilename(title = "Select file", filetypes = (("text files","*.txt"),("all files","*.*")))
     if f_loc == '': home() #no file was selected
     else:
-        iperf_server.clear_state()
         f = open(f_loc, mode='r')
         line_1 = f.readline().split(',')
         try:
@@ -731,10 +787,9 @@ def to_none(string:str):
         return string
 
 
-def is_valid_config(print_error=None):
+def is_valid_config():
     """
     Checks wheter the current configuration is a valid configuration.
-    Argument print_error should be a function with an string list argument, which will output the reason(s) if it is invalid.
     """
     if active_config == None:
         print_error(["No configuration selected"])
@@ -752,7 +807,7 @@ def is_valid_config(print_error=None):
         correct_values = False
         error_txt.append("No device in this test")
     for d in active_config.dev_configs:
-        correct_values = is_valid_dev_config(d, error_txt.append) and correct_values
+        correct_values = is_valid_dev_config(d) and correct_values
     
     #check if device is connected and has all specified CCAs
     update_dev()
@@ -768,19 +823,18 @@ def is_valid_config(print_error=None):
                     correct_values = False
                     error_txt.append(f"Device \"{name}\" has no CCA \"{cca}\"")
 
-    if (not correct_values) and print_error:
+    if (not correct_values):
         print_error(error_txt)
     return correct_values
 
-def is_valid_dev_config(dev_config:Dev_config, print_error=None):
+def is_valid_dev_config(dev_config:Dev_config):
     """
     Checks wheter a given device configuration is a valid device configuration.
-    Argument print_error should be a function with an string list argument, which will output the reason(s) if it is invalid.
     """
     correct_values = True #Set to false if any value does not meet criterea
     error_txt = [f"Invalid device configuration for {dev_config.name}"]
     if dev_config.length <= 0: error_txt.append(f"Invalid length, must be strictly larger than 0, is {dev_config.length}"); correct_values = False
-    correct_values = is_valid_addr(dev_config.addr, lambda str: error_txt.append(str)) and correct_values
+    correct_values = is_valid_addr(dev_config.addr) and correct_values
     num_cca = len(dev_config.ccas)
     if num_cca != dev_config.number_of_cca:
         correct_values = False
@@ -789,14 +843,13 @@ def is_valid_dev_config(dev_config:Dev_config, print_error=None):
         correct_values = False
         error_txt.append(f"Number of selected CCAs: {num_cca}, must be strictly larger than 0")
     
-    if (not correct_values) and print_error:
+    if (not correct_values):
         print_error(error_txt)
     return correct_values
 
-def is_valid_addr(addr:tuple, print_error=None):
+def is_valid_addr(addr:tuple):
     """
     Checks wheter a given addr is a valid address.
-    Argument print_error should be a function with an string argument, which will output the reason if it is invalid.
     """
     valid = True
     ip, port = addr
@@ -804,11 +857,11 @@ def is_valid_addr(addr:tuple, print_error=None):
         socket.inet_aton(ip)
     except OSError:
         valid = False
-        if print_error: print_error("Given ip address is not valid")
+        print_error("Given ip address is not valid")
     max_port = 65535
     if not (port >= 0 and port < max_port):
         valid = False
-        if print_error: print_error(f"Port range is invalid, must be between 0 (inclusive) and {max_port}")
+        print_error(f"Port range is invalid, must be between 0 (inclusive) and {max_port}")
     return valid
         
 ##################################### main function####################################################################################################################################################

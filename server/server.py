@@ -3,9 +3,10 @@ import select
 import threading
 import time
 import queue
+import subprocess
 
 import server_frontend
-from data_structures import Device, Config, Dev_config
+from data_structures import *
 
 HOST = ''#'127.0.0.1' 
 PORT = 65432        # Port to listen on (non-privileged ports are > 1023)
@@ -14,13 +15,14 @@ socket_list = [] #list with all active sockets
 write_list = [] #list with sockets to be written to
 devices = []
 shutdown_flag = False
+results_folder = "Test_result"
 
 #Queues for communicating between threads
 #queue for getting messages to send to devices
 config_queue = queue.Queue()
 #queue to notify frontend of available devices. This queue is empty unless frontend sends signal 2 (in the signal_queue).
 device_queue = queue.Queue()
-#different signals: 1=shutdown, 2=update available devices
+#different signals: 1=shutdown, 2=update available devices, 3=abort test execution
 signal_queue = queue.Queue()
 
 
@@ -94,9 +96,11 @@ def update():
         i = signal_queue.get_nowait()
         if i == 1:
             shutdown()
-        else:
+        elif i == 2:
             #i == 2 #update available devices
             device_queue.put(devices.copy())
+        elif i == 3:
+            pass #TODO implement aborting an test execution
     except queue.Empty: pass #no signal received, can continue
 
     try:
@@ -207,6 +211,11 @@ def handle_msg10(msg_data, device:Device):
 
 def handle_msg21(msg_data, device):
     print(f"{device.name} returned from a test run with:\n{msg_data}")
+    try:
+        server_frontend.state.dev_status[device.name] = 1
+    except KeyError: pass
+    if server_frontend.state.all_finished_stage(0):
+        collect_data(server_frontend.state)
 
 def send_msg(msg, device):
     """
@@ -216,6 +225,67 @@ def send_msg(msg, device):
     if write_list.count(device.socket) == 0:
         write_list.append(device.socket)
     else: pass #this socket is already in the write_list, don't add it again
+
+def collect_data(state:State):
+    """
+    Gets all files from the test from the devices using adb
+    Modifies the state
+    """
+    connected_devs = get_adb_devices()
+    for d in connected_devs:
+        has_pulled = pull_file("/sdcard/res_id.txt", d)
+        if not has_pulled: continue #no res_id.txt found, no results to pull
+        f = open(f"/{results_folder}/res_id.txt")
+        tmp = f.readline().strip().split(',')
+        dev_name = tmp[0]
+        test_name = tmp[1]
+        if not test_name == state.config_name: continue #res_id.txt is not from this test, probably an older result
+
+        if dev_name in state.dev_status:
+            status = state.dev_status[dev_name]
+            if status == 1:
+                files = f.readline().split(',')
+                for f_loc in files:
+                    if not pull_file(f_loc, d): print(f"Could not pull file {f_loc} from device \"{dev_name}\"")
+                state.dev_status[dev_name] = 2
+    if state.all_finished_stage(1):
+        state.finished = True
+        #TODO process the data
+    state.pull_complete = True
+
+
+def pull_file(src_file, device, dst=f"/{results_folder}"):
+    """
+    Tries to pull a file from the device.
+    Args: src_file: path to the file, device: which adb device to pull it from, dst: destination
+    returns True if succeeded, False otherwise
+    """
+    out = execute(f"adb -s {device} pull {src_file} {dst}")
+    return out[0:6] == "[100%]"
+
+def get_adb_devices():
+    x = execute("adb devices")
+    lines = x.split(f"\n")
+    devs = []
+    for l in lines[1:]:
+        dev = l.split()[0]
+        devs.append(dev)
+    return devs
+
+def execute(cmd:str, with_error=False):
+    input = cmd.split()
+    p = subprocess.Popen(input, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    stdout, stderr = p.communicate()
+    if (with_error):
+        stdout += f"\n{stderr}"
+    return stdout.decode("utf-8").strip()
+
+def exeucte_multiple(cmds:list, with_error=False):
+    out = ""
+    for cmd in cmds:
+        out += execute(cmd, with_error) + f"\n"
+    return out
+
 
 def main():
     

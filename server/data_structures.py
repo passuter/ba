@@ -66,6 +66,45 @@ class Trace:
         self.loss = loss
         self.rate = rate
 
-    
+class State:
+    started:bool = False
+    pull_complete:bool = False
+    finished:bool = False
+    config_name:str
+    #maps a device to a status
+    dev_status:dict = dict() 
+    status:dict = {
+        0: "running",
+        1: "finished run",
+        2: "data pulled",
+    }
 
+    def __init__(self, config:Config):
+        self.config_name = config.name
+        for d in config.dev_configs:
+            self.dev_status[d.name] = 0
+
+    def all_finished_stage(self, i:int):
+        """
+        Returns true if all devices have finished the stage i
+        """
+        run_complete = True
+        for d in self.dev_status:
+            if self.dev_status[d] <= i:
+                run_complete = False
+        return run_complete
+
+    def print_status(self):
+        """
+        Returns this state as a string
+        """
+        if not self.started:
+            return "Test has not yet started"
+        elif self.finished:
+            return "Test has finished"
+        else:
+            txt = ""
+            for name in self.dev_status:
+                txt += f"{name}: {self.status[self.dev_status[name]]}\n"
+            return txt
 
