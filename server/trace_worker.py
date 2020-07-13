@@ -1,5 +1,7 @@
 import shutil
 
+from data_structures import Trace
+
 
 """
 This file handles the conversion of traces to the required format.
@@ -10,6 +12,7 @@ handler_mapping:dict = dict()
 def init():
     global handler_mapping
     handler_mapping = {
+        'txt': txt_loader,
     }
 
 def convert_trace(source:str, trace_handler:str,):
@@ -24,6 +27,16 @@ def convert_trace(source:str, trace_handler:str,):
 """
 A trace hanlder should have following properties:
  - 1 argrument, the source file of the trace.
- - returns 3 lists of strings, 1. delay list, 2. loss list, 3. rate list
+ - returns an object of type Trace, see data_structures.py
  - delays are in ms, loss in %, rate as a number with units (e.g. 10Gbps, 3Mbps, 1Kbps)
+ - the handlers name in the handler_mapping (defined in init) should not be 'None'
 """
+def txt_loader(src:str):
+    """
+    Simplest handler, just reads all the values from the file
+    """
+    f = open(src)
+    delay = f.readline().split(',')
+    loss = f.readline().split(',')
+    rate = f.readline().split(',')
+    return Trace(delay, loss, rate)

@@ -137,8 +137,8 @@ def generate_traces():
         if dev_config.trace_name in traces:
             continue # trace has been converted already
         else:
-            delay, loss, rate = trace_worker.convert_trace(dev_config.trace_name, dev_config.trace_handler)
-            traces[dev_config.trace_name] = Trace(delay, loss, rate)
+            trace = trace_worker.convert_trace(dev_config.trace_name, dev_config.trace_handler)
+            traces[dev_config.trace_name] = trace
 
 
 def clear_setup():

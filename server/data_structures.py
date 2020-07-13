@@ -1,3 +1,4 @@
+from os import path
 
 class Device:
     socket = None
@@ -29,17 +30,15 @@ class Config:
 class Dev_config:
     name:str #name of the device
     length:int #length of the test
-    rate:str #bandwidth limit in Mbps
     trace_name:str #name of the trace file
     trace_handler:str #name of the handler in trace_worker.py
     addr:tuple #address of the iperf server (ip, port)
     number_of_cca:int
     ccas:list #stringlist
 
-    def __init__(self, dev_name, length, rate, trace_name, trace_handler, addr, num_cca, ccas):
+    def __init__(self, dev_name, length, trace_name, trace_handler, addr, num_cca, ccas):
         self.name = dev_name
         self.length = length
-        self.rate = rate
         self.trace_name = trace_name
         self.trace_handler = trace_handler
         self.addr = addr
@@ -49,6 +48,12 @@ class Dev_config:
     def get_ip(self):
         ip, _ = self.addr
         return ip
+
+    def get_trace_name(self):
+        if self.trace_name == None: return "None"
+        else:
+            _, trace_file_name = path.split(self.trace_name)
+            return trace_file_name
 
 class Server_settings:
     iperf_exec:str = "" #location of the iperf executable on the server

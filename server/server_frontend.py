@@ -382,7 +382,7 @@ class Mod_config_frame(Frame):
 
         count = 0 #counts number of CCAs displayed
         max_displ = 5
-        text = f"Device Name: {dev_conf.name}\nRuntime: {dev_conf.length}s\nIperf Address: {dev_conf.addr}\nTrace: {dev_conf.trace_name}\nCCAs (shows maximal {max_displ}):"
+        text = f"Device Name: {dev_conf.name}\nRuntime: {dev_conf.length}s\nIperf Address: {dev_conf.addr}\nTrace: {dev_conf.get_trace_name()}\nCCAs (shows maximal {max_displ}):"
         for cca in dev_conf.ccas:
             count += 1
             if count > max_displ: break
@@ -392,6 +392,7 @@ class Mod_config_frame(Frame):
     def on_modify(self):
         dev_conf = self.get_selected_dev()
         if dev_conf == None: return
+        update_dev()
         device = get_dev_by_name(devices, dev_conf.name)
         if device == None: print(f"Cannot modifiy, {dev_conf.name} not connected")
         else: close_and_call(self, lambda:mod_dev_config(device, dev_conf))
@@ -408,13 +409,15 @@ class Mod_config_frame(Frame):
 
     
 class Mod_dev_config_frame(Frame):
-    def __init__(self, parent, device, device_config):
+    def __init__(self, parent, device:Device, device_config:Dev_config):
         Frame.__init__(self, parent)
+        self.dev_conf = device_config #save device to access it from other functions
         self.dev_name = device.name
+        self.device = device
         top_lbl = Label(self, text=f"Configuration: \"{active_config.name}\", Device: \"{self.dev_name}\"")
         bot_frame = Frame(self)
         btn_back = Back_btn(bot_frame, cmd=lambda: close_and_call(self,mod_config))
-        btn_ok = Ok_btn(bot_frame, self.ok_action)
+        btn_ok = Ok_btn(bot_frame, self.on_ok)
 
         #Frame to hold entry boxes to enter the config of the device
         #expose entries with self to functions in class
@@ -424,21 +427,24 @@ class Mod_dev_config_frame(Frame):
         self.length_entry = Entry(lhs)
         self.length_entry.grid(row=0, column=1)
         self.length_entry.insert(END, device_config.length)
-        trace_lbl = Label(lhs, text="Placeholder to select trace")
-        #TODO select trace gui
+        trace_txt1 = f"Selected trace file:\n{device_config.get_trace_name()}"
+        trace_lbl = Label(lhs, text=trace_txt1)
         trace_lbl.grid(row=1)
+        trace_lbl2 = Label(lhs, text=f"Handler: {device_config.trace_handler}")
+        trace_lbl2.grid(row=2, column=0)
+        trace_select_btn = Button(lhs, text="Select trace", command=self.select_trace)
+        trace_select_btn.grid(row=2, column=1)
         ip, port = device_config.addr
         ip_lbl = Label(lhs, text="Enter ip of iperf server")
-        ip_lbl.grid(row=2, column=0)
+        ip_lbl.grid(row=3, column=0)
         self.ip_entry = Entry(lhs)
-        self.ip_entry.grid(row=2, column=1)
+        self.ip_entry.grid(row=3, column=1)
         self.ip_entry.insert(END, ip)
         port_lbl = Label(lhs, text="Enter port of iperf server")
-        port_lbl.grid(row=3, column=0)
+        port_lbl.grid(row=4, column=0)
         self.port_entry = Entry(lhs)
-        self.port_entry.grid(row=3, column=1)
+        self.port_entry.grid(row=4, column=1)
         self.port_entry.insert(END, port)
-
 
         #Frame to hold lisbox widget to select the CCAs
         rhs = Frame(self)
@@ -449,7 +455,6 @@ class Mod_dev_config_frame(Frame):
         for cca in device.ccas:
             self.lb.insert(END, cca)
 
-
         top_lbl.pack(side=TOP)
         bot_frame.pack(side=BOTTOM)
         lhs.pack(side=LEFT)
@@ -459,7 +464,8 @@ class Mod_dev_config_frame(Frame):
     
     def ok_action(self):
         """
-        Reads all values and checks if they are sensible and result in a correct device configuration
+        Reads all values and checks if they are sensible and result in a correct device configuration, if yes adds it to the configuration
+        Returns true if the config was modified, false if an entry was nonvalid
         """
         correct_values = True
         try: length = int(self.length_entry.get())
@@ -473,25 +479,75 @@ class Mod_dev_config_frame(Frame):
             ccas.append(self.lb.get(i))
         
         if correct_values:
-            dev_config = Dev_config(self.dev_name, length, "50", None, None, (ip, port), len(ccas), ccas)
-            if is_valid_dev_config(dev_config): self.ok(dev_config)
-            else: pass #some entry was invalid, nothing to do
-        else: pass #some entry was invalid, nothing to do
+            dev_config = Dev_config(self.dev_name, length, self.dev_conf.trace_name, self.dev_conf.trace_handler, (ip, port), len(ccas), ccas)
+            if is_valid_dev_config(dev_config):
+                #remove duplicate
+                for d in active_config.dev_configs:
+                    if d.name == dev_config.name:
+                        active_config.dev_configs.remove(d)
+                        active_config.num_of_dev -= 1        
+                #add dev_conf
+                active_config.dev_configs.append(dev_config)
+                active_config.num_of_dev += 1
+                return True
+            else: return False #some entry was invalid
+        else: return False #some entry was invalid
 
-    def ok(self, dev_conf):
-        """
-        Adds the dev_conf to the currently active configuration (removes duplicates if necessary)
-        """
-        #remove duplicate
-        for d in active_config.dev_configs:
-            if d.name == dev_conf.name:
-                active_config.dev_configs.remove(d)
-                active_config.num_of_dev -= 1
-        
-        #add dev_conf
-        active_config.dev_configs.append(dev_conf)
-        active_config.num_of_dev += 1
-        close_and_call(self, mod_config)
+    def on_ok(self):
+        if self.ok_action():
+            close_and_call(self, mod_config)
+    
+    def select_trace(self):
+        if self.ok_action():
+            close_and_call(self, lambda:Select_trace_frame(self.dev_conf, self.device))
+
+class Select_trace_frame(Frame):
+    def __init__(self, dev_conf:Dev_config, device:Device):
+        Frame.__init__(self, root, width=window_width, height=window_height)
+        self.dev_conf = dev_conf
+        self.device = device
+        self.pack(fill=BOTH)
+        top_lbl = Label(self, text=f"Trace selection for device {dev_conf.name}")
+        top_lbl.pack(side=TOP)
+        trace_txt = f"Selected trace file:\n{dev_conf.trace_name}"
+        trace_lbl1 = Label(self, text=trace_txt)
+        trace_lbl1.pack(side=TOP)
+        trace_select_btn = Button(self, text="Select trace", command=self.select_trace)
+        trace_select_btn.pack(side=TOP)
+        trace_lbl2 = Label(self, text=f"Select handler:")
+        trace_lbl2.pack(side=TOP)
+        self.lb = Listbox(self, selectmode=SINGLE)
+        self.lb.insert(END, "None")
+        for handler in trace_worker.handler_mapping:
+            self.lb.insert(END, handler)
+        self.lb.pack(side=TOP)
+        bot_frame = Frame(self)
+        bot_frame.pack(side=BOTTOM)
+        ok_btn = Ok_btn(bot_frame, self.ok)
+        ok_btn.pack(side=RIGHT)
+        back_btn = Back_btn(bot_frame, self.cancel)
+        back_btn.pack(side=LEFT)
+
+    def cancel(self):
+        close_and_call(self, lambda: mod_dev_config(self.device, self.dev_conf))
+    
+    def ok(self):
+        i = self.lb.curselection()
+        if i:
+            handler = self.lb.get(i)
+            if handler == "None":
+                self.dev_conf.trace_name = None
+                self.dev_conf.trace_handler = None
+            else:
+                self.dev_conf.trace_handler = handler
+            close_and_call(self, lambda: mod_dev_config(self.device, self.dev_conf))
+        else: print_error(["No handler was selected"])
+
+    def select_trace(self):
+        trace_name = filedialog.askopenfilename(title="Select trace file")
+        if trace_name == '': return
+        self.dev_conf.trace_name = trace_name
+        close_and_call(self, lambda: Select_trace_frame(self.dev_conf, self.device))
 
 class Run_config_frame(Frame):
     def __init__(self, parent):
@@ -635,7 +691,7 @@ def add_dev_config2():
     if index == -1: mod_config() #no device selected, return to modify configuration screen
     else:
         dev = devices[index]
-        conf = Dev_config(dev.name, 0, "50", None, None, (server_settings.ip, 0), 0, [])
+        conf = Dev_config(dev.name, 0, None, None, (server_settings.ip, 0), 0, [])
         mod_dev_config(dev, conf)
 
 def start_run():
@@ -650,6 +706,7 @@ def start_run():
             view_run_progress()
         else:
             print("Could not setup the iperf server")
+            iperf_server.clear_setup()
             home()
     else:
         home() #cannot run invalid configuration
@@ -676,7 +733,7 @@ def dev_conf_to_str(dev_conf:Dev_config):
     Writes the device configuration into a string (ends it with newline)
     """
     ip, port = dev_conf.addr
-    txt = f"{dev_conf.name},{dev_conf.length},{dev_conf.rate},{dev_conf.trace_name},{dev_conf.trace_handler},{ip},{port},{dev_conf.number_of_cca}"
+    txt = f"{dev_conf.name},{dev_conf.length},{dev_conf.trace_name},{dev_conf.trace_handler},{ip},{port},{dev_conf.number_of_cca}"
     for cca in dev_conf.ccas:
         txt +=f",{cca}"
     return txt
@@ -724,7 +781,7 @@ def load_v1(f, name, f_loc):
         ccas = []
         for j in range(num_cca):
             ccas.append(l[6+j])
-        dev_conf = Dev_config(dev_name, length, "50", None, None, addr, num_cca, ccas)
+        dev_conf = Dev_config(dev_name, length, None, None, addr, num_cca, ccas)
         dev_list.append(dev_conf)
     conf = Config(name, f_loc, num_of_dev, dev_list)
     global active_config
@@ -747,7 +804,7 @@ def load_v2(f, name, f_loc):
         ccas = []
         for j in range(num_cca):
             ccas.append(l[6+j])
-        dev_conf = Dev_config(dev_name, length, "50", None, None, addr, num_cca, ccas)
+        dev_conf = Dev_config(dev_name, length, None, None, addr, num_cca, ccas)
         dev_list.append(dev_conf)
     conf = Config(name, f_loc, num_of_dev, dev_list)
     global active_config
@@ -764,17 +821,16 @@ def load_v3(f, name, f_loc):
         l = l.rstrip().split(',') #remove tailing newline & split by ','
         dev_name = l[0]
         length = int(l[1])
-        rate = l[2]
-        trace_name = l[3]
+        trace_name = l[2]
         trace_name = to_none(trace_name)
-        trace_handler = l[4]
+        trace_handler = l[3]
         trace_handler = to_none(trace_handler)
-        addr = (l[5], int(l[6]))
-        num_cca = int(l[7])
+        addr = (l[4], int(l[5]))
+        num_cca = int(l[6])
         ccas = []
         for j in range(num_cca):
-            ccas.append(l[8+j])
-        dev_conf = Dev_config(dev_name, length, rate, trace_name, trace_handler, addr, num_cca, ccas)
+            ccas.append(l[7+j])
+        dev_conf = Dev_config(dev_name, length, trace_name, trace_handler, addr, num_cca, ccas)
         dev_list.append(dev_conf)
     conf = Config(name, f_loc, num_of_dev, dev_list)
     global active_config
@@ -833,7 +889,9 @@ def is_valid_dev_config(dev_config:Dev_config):
     """
     correct_values = True #Set to false if any value does not meet criterea
     error_txt = [f"Invalid device configuration for {dev_config.name}"]
-    if dev_config.length <= 0: error_txt.append(f"Invalid length, must be strictly larger than 0, is {dev_config.length}"); correct_values = False
+    if dev_config.length <= 0:
+        error_txt.append(f"Invalid length, must be strictly larger than 0, is {dev_config.length}")
+        correct_values = False
     correct_values = is_valid_addr(dev_config.addr) and correct_values
     num_cca = len(dev_config.ccas)
     if num_cca != dev_config.number_of_cca:
