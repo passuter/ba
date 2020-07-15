@@ -1,1 +1,1 @@
-D:/PascalS/Documents/BA/server/tmp/info.txt,eth0
+iperf3,wlp2s0

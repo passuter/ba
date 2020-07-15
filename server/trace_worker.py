@@ -36,7 +36,7 @@ def txt_loader(src:str):
     Simplest handler, just reads all the values from the file
     """
     f = open(src)
-    delay = f.readline().split(',')
-    loss = f.readline().split(',')
-    rate = f.readline().split(',')
+    delay = f.readline().strip().split(',')
+    loss = f.readline().strip().split(',')
+    rate = f.readline().strip().split(',')
     return Trace(delay, loss, rate)

@@ -105,11 +105,12 @@ class State:
         """
         if not self.started:
             return "Test has not yet started"
-        elif self.finished:
-            return "Test has finished"
         else:
             txt = ""
             for name in self.dev_status:
                 txt += f"{name}: {self.status[self.dev_status[name]]}\n"
-            return txt
+        if self.finished:
+            txt += "Test has finished"
+        return txt
+        
 

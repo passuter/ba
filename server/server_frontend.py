@@ -108,13 +108,14 @@ class Settings_frame(Frame):
         info_lbl = Label(self, text=info)
         info_lbl.pack(side=TOP)
         container = Frame(self)
-        iperf_lbl = Label(container, text=f"Iperf executable:\n{server_settings.iperf_exec}")
+        iperf_lbl = Label(container, text=f"Command to run iperf:\n{server_settings.iperf_exec}")
         iperf_lbl.grid(row=0, column=0)
-        iperf_select = Button(container, text="Select", command=self.on_select)
-        iperf_select.grid(row=0, column=1)
+        self.iperf_entry = Entry(container)
+        self.iperf_entry.insert(END, server_settings.iperf_exec)
+        self.iperf_entry.grid(row=0, column=1)
         sep1 = Separator(container, 20)
         sep1.grid(row=1)
-        net_dev_lbl = Label(container, text="Network device (card) which will receive traffic (used for netem): ")
+        net_dev_lbl = Label(container, text=f"Network device (card) which will\nreceive traffic (used for netem):")
         net_dev_lbl.grid(row=2, column=0)
         self.net_dev_entry = Entry(container)
         self.net_dev_entry.insert(END, server_settings.network_dev)
@@ -135,6 +136,7 @@ class Settings_frame(Frame):
         close_and_call(self, edit_settings)
     
     def ok(self):
+        server_settings.iperf_exec = self.iperf_entry.get().strip()
         server_settings.network_dev = self.net_dev_entry.get()
         save_settings()
         close_and_call(self, home)
@@ -580,11 +582,12 @@ class Run_config_frame(Frame):
             back_btn.pack()
         
     def update(self):
-        if state.all_finished_stage(0):
+        if state.all_finished_stage(1):
             state.finished=True
         close_and_call(self, view_run_progress)
     
     def run_conf(self):
+        iperf_server.start_emulating()
         config_queue.put(active_config.copy())
         state.started=True
         close_and_call(self, view_run_progress)

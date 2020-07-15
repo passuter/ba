@@ -5,7 +5,7 @@ import time
 import queue
 import subprocess
 
-import server_frontend
+import server_frontend, iperf_server
 from data_structures import *
 
 HOST = ''#'127.0.0.1' 
@@ -206,6 +206,8 @@ def handle_msg03(msg_data, device:Device):
 def handle_msg10(msg_data, device:Device):
     name, ccas = msg_data[0], msg_data[1:]
     device.name = name
+    for i in range(len(ccas)):
+        ccas[i] = ccas[i].strip()
     device.ccas = ccas
     send_msg(f",11,ack 01\n", device)
 
@@ -215,6 +217,7 @@ def handle_msg21(msg_data, device):
         server_frontend.state.dev_status[device.name] = 1
     except KeyError: pass
     if server_frontend.state.all_finished_stage(0):
+        iperf_server.stop_emulating()
         collect_data(server_frontend.state)
 
 def send_msg(msg, device):
@@ -234,10 +237,11 @@ def collect_data(state:State):
     connected_devs = get_adb_devices()
     for d in connected_devs:
         has_pulled = pull_file("/sdcard/res_id.txt", d)
-        if not has_pulled: continue #no res_id.txt found, no results to pull
-        f = open(f"/{results_folder}/res_id.txt")
+        if not has_pulled: continue #no res_id.txt found, no results to pulls
+        f = open(f"{results_folder}/res_id.txt")
         tmp = f.readline().strip().split(',')
         dev_name = tmp[0]
+        #print(f"Trying to pull data from {dev_name}")
         test_name = tmp[1]
         if not test_name == state.config_name: continue #res_id.txt is not from this test, probably an older result
 
@@ -250,18 +254,22 @@ def collect_data(state:State):
                 state.dev_status[dev_name] = 2
     if state.all_finished_stage(1):
         state.finished = True
-        #TODO process the data
     state.pull_complete = True
+    #print(state.print_status())
 
 
-def pull_file(src_file, device, dst=f"/{results_folder}"):
+def pull_file(src_file, device, dst=f"{results_folder}"):
     """
     Tries to pull a file from the device.
     Args: src_file: path to the file, device: which adb device to pull it from, dst: destination
-    returns True if succeeded, False otherwise
+    returns True if succeeded or no src file specified, False otherwise
     """
+    if src_file == '': return True
+    #print(f"Trying to pull {src_file}") #debug only
     out = execute(f"adb -s {device} pull {src_file} {dst}")
-    return out[0:6] == "[100%]"
+    succ = out[0] == "["
+    #print(f"Pull successful: {succ}, out = {out}") #debug only
+    return succ
 
 def get_adb_devices():
     x = execute("adb devices")
@@ -280,7 +288,7 @@ def execute(cmd:str, with_error=False):
         stdout += f"\n{stderr}"
     return stdout.decode("utf-8").strip()
 
-def exeucte_multiple(cmds:list, with_error=False):
+def execute_multiple(cmds:list, with_error=False):
     out = ""
     for cmd in cmds:
         out += execute(cmd, with_error) + f"\n"
