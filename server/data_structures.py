@@ -82,6 +82,7 @@ class State:
         0: "running",
         1: "finished run",
         2: "data pulled",
+        3: "data processed"
     }
 
     def __init__(self, config:Config):

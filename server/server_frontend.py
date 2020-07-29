@@ -504,8 +504,10 @@ class Mod_dev_config_frame(Frame):
             close_and_call(self, lambda:Select_trace_frame(self.dev_conf, self.device))
 
 class Select_trace_frame(Frame):
-    def __init__(self, dev_conf:Dev_config, device:Device):
+    def __init__(self, dev_conf:Dev_config, device:Device, debug=False, ret_cmd=None):
         Frame.__init__(self, root, width=window_width, height=window_height)
+        self.debug = debug
+        self.ret_cmd = ret_cmd #used to specify an alternate return command for debugging
         self.dev_conf = dev_conf
         self.device = device
         self.pack(fill=BOTH)
@@ -531,7 +533,11 @@ class Select_trace_frame(Frame):
         back_btn.pack(side=LEFT)
 
     def cancel(self):
-        close_and_call(self, lambda: mod_dev_config(self.device, self.dev_conf))
+        if self.debug:
+            print("debug")
+            close_and_call(self, lambda: self.ret_cmd(self.device, self.dev_conf))
+        else:
+            close_and_call(self, lambda: mod_dev_config(self.device, self.dev_conf))
     
     def ok(self):
         i = self.lb.curselection()
@@ -542,14 +548,17 @@ class Select_trace_frame(Frame):
                 self.dev_conf.trace_handler = None
             else:
                 self.dev_conf.trace_handler = handler
-            close_and_call(self, lambda: mod_dev_config(self.device, self.dev_conf))
+            if self.debug:
+                close_and_call(self, lambda: self.ret_cmd(self.device, self.dev_conf))
+            else:
+                close_and_call(self, lambda: mod_dev_config(self.device, self.dev_conf))
         else: print_error(["No handler was selected"])
 
     def select_trace(self):
         trace_name = filedialog.askopenfilename(title="Select trace file")
         if trace_name == '': return
         self.dev_conf.trace_name = trace_name
-        close_and_call(self, lambda: Select_trace_frame(self.dev_conf, self.device))
+        close_and_call(self, lambda: Select_trace_frame(self.dev_conf, self.device, debug=self.debug, ret_cmd=self.ret_cmd))
 
 class Run_config_frame(Frame):
     def __init__(self, parent):
@@ -623,37 +632,6 @@ class Ask_abort_frame(Frame):
         iperf_server.clear_setup()
         signal_queue.put(3)
         close_and_call(self, home)
-
-"""    
-class Ask_sudo_frame(Frame):
-    def __init__(self, parent):
-        Frame.__init__(self, parent, width=window_width, height=window_height)
-        self.pack(fill=BOTH)
-        top_lbl = Label(self, text=f"Enter sudo password.\nIt is needed to automatically setup netem.")
-        top_lbl.pack(side=TOP)
-        self.entry = Entry(self)
-        self.entry.pack(side=TOP)
-        bot_frame = Frame(self)
-        bot_frame.pack(side=BOTTOM)
-        cont_btn = Button(bot_frame, text="Continue without sudo", command=self.without, width=default_btn_width)
-        cont_btn.pack(side=TOP)
-        back_btn = Back_btn(bot_frame, lambda: close_and_call(self, home))
-        back_btn.pack(side=LEFT)
-        ok_btn = Ok_btn(bot_frame, self.ok)
-        ok_btn.pack(side=RIGHT)
-    
-    def ok(self):
-        password = self.entry.get()
-        if password == '':
-            return
-        else:
-            server_settings.sudo_pw = password
-            close_and_call(self, view_run_progress)
-
-    def without(self):
-        server_settings.sudo_pw = None
-        close_and_call(self, view_run_progress)
-"""
 
 def new_conf():
     """
@@ -926,20 +904,24 @@ def is_valid_addr(addr:tuple):
     return valid
         
 ##################################### main function####################################################################################################################################################
-def main(conf_queue:queue.Queue, dvice_queue:queue.Queue, signl_queue:queue.Queue):
-    global config_queue, device_queue, signal_queue, root
+def init_tk():
+    global root
     root = Tk()
     root.geometry("500x500")
     root.title("Control server")
+    root.protocol("WM_DELETE_WINDOW", shutdown) #closing the window also triggers a shutdown of the server
+
+
+def main(conf_queue:queue.Queue, dvice_queue:queue.Queue, signl_queue:queue.Queue):
+    global config_queue, device_queue, signal_queue
     config_queue = conf_queue
     device_queue = dvice_queue
     signal_queue = signl_queue
-    root.protocol("WM_DELETE_WINDOW", shutdown) #closing the window also triggers a shutdown of the server
+    init_tk()
     trace_worker.init()
     load_settings()
     home()
-    #test()
     mainloop()
 
 if __name__ == "__main__":
-    main(None, None, None)
+    main(None, None, None) #starts the frontend only, used for debugging

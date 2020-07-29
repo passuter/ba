@@ -16,6 +16,7 @@ traces:dict = dict() #mapping of traces files to Trace objects
 netem_thread = None
 iperf_processes = []
 running = False
+emulating_intervall = 10 #intervall in ms for trace emulation
 
 def setup():
     """
@@ -37,6 +38,9 @@ def setup():
     except FileNotFoundError:
         print(f"Shell error, FileNotFound")
         return False
+
+    if emulating_intervall <= 0:
+        raise ValueError(f"Invalid emulating_intervall in iperf_server.py. Must be >0")
 
     generate_traces()
     start_iperf_processes()
@@ -83,7 +87,7 @@ def netem_emulator(flow_mappings):
                 print(cmd)
                 print(out)
         i += 1
-        sleep(0.01) #wait for 10ms before changing again
+        sleep(emulating_intervall/1000) #wait for specified intervall before changing again
 
 
 def execute(cmd, with_error=False):
@@ -158,9 +162,9 @@ def run_iperf(port, iperf_cmd):
 def generate_traces():
     for dev_config in server_frontend.active_config.dev_configs:
         if dev_config.trace_name in traces:
-            continue # trace has been converted already
+            continue # trace has been loaded already
         else:
-            trace = trace_worker.convert_trace(dev_config.trace_name, dev_config.trace_handler)
+            trace = trace_worker.load_trace(dev_config.trace_name, dev_config.trace_handler)
             traces[dev_config.trace_name] = trace
 
 
@@ -173,7 +177,11 @@ def clear_setup():
     global netem_thread, traces, running
     netem_thread = None
     #remove the rules again
-    execute(f"sudo tc qdisc del dev {server_frontend.server_settings.network_dev} handle 1: root htb")
+    try:
+        execute(f"sudo tc qdisc del dev {server_frontend.server_settings.network_dev} handle 1: root htb")
+    except FileNotFoundError:
+        #FileNotFoundError occurrs when shel doesn't work (e.g. on windows)
+        pass
     while iperf_processes:
         p = iperf_processes.pop()
         p.terminate()
