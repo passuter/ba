@@ -164,8 +164,9 @@ def generate_traces():
         if dev_config.trace_name in traces:
             continue # trace has been loaded already
         else:
-            trace = trace_worker.load_trace(dev_config.trace_name, dev_config.trace_handler)
-            traces[dev_config.trace_name] = trace
+            if dev_config.trace_handler != None:
+                trace = trace_worker.load_trace(dev_config.trace_name, dev_config.trace_handler)
+                traces[dev_config.trace_name] = trace
 
 
 def clear_setup():

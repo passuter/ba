@@ -130,7 +130,7 @@ class Settings_frame(Frame):
 
     def on_select(self):
         loc = filedialog.askopenfilename(title="Select Iperf executable")
-        if loc == '': return
+        if loc == '' or loc == (): return
         server_settings.iperf_exec = loc
         server_settings.network_dev = self.net_dev_entry.get()
         close_and_call(self, edit_settings)
@@ -323,7 +323,7 @@ class New_config_frame(Frame):
     def ok(self):
         conf_name= self.e.get()
         loc = filedialog.asksaveasfilename(title = "Save as", defaultextension='.txt', filetypes = (("text files","*.txt"),("all files","*.*")))
-        if conf_name == '' or loc == '': return
+        if conf_name == '' or loc == '' or loc == (): return
         config = Config(conf_name, (loc+".txt"), 0, [])
         global active_config
         active_config = config
@@ -556,7 +556,7 @@ class Select_trace_frame(Frame):
 
     def select_trace(self):
         trace_name = filedialog.askopenfilename(title="Select trace file")
-        if trace_name == '': return
+        if trace_name == '' or trace_name == (): return
         self.dev_conf.trace_name = trace_name
         close_and_call(self, lambda: Select_trace_frame(self.dev_conf, self.device, debug=self.debug, ret_cmd=self.ret_cmd))
 
@@ -725,7 +725,7 @@ def load_conf():
     Asks for a configuration to open and puts it into active_config.
     """
     f_loc = filedialog.askopenfilename(title = "Select file", filetypes = (("text files","*.txt"),("all files","*.*")))
-    if f_loc == '': home() #no file was selected
+    if f_loc == '' or f_loc == (): home() #no file was selected
     else:
         f = open(f_loc, mode='r')
         line_1 = f.readline().split(',')
