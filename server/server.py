@@ -5,7 +5,7 @@ import time
 import queue
 import subprocess
 
-import server_frontend, iperf_server
+import server_frontend, iperf_server, processing
 from data_structures import *
 
 HOST = ''#'127.0.0.1' 
@@ -251,9 +251,9 @@ def collect_data(state:State):
                 files = f.readline().split(',')
                 for f_loc in files:
                     if not pull_file(f_loc, d): print(f"Could not pull file {f_loc} from device \"{dev_name}\"")
-                state.dev_status[dev_name] = 2
+                state.set_state(dev_name, 2)
     if state.all_finished_stage(1):
-        state.finished = True
+        processing.begin_processing()
     state.pull_complete = True
     #print(state.print_status())
 
@@ -298,6 +298,7 @@ def execute_multiple(cmds:list, with_error=False):
 def main():
     
     frontend_thread = start_UI()
+    processing.init()
     server_loop()
     frontend_thread.join()
 

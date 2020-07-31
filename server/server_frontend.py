@@ -288,7 +288,7 @@ class Config_frame(Frame):
         btn_edit_config = Button(mid_frame, text="Edit current", width=15)
         btn_edit_config['command']= lambda: close_and_call(parent, mod_config)
         btn_sel_config = Button(mid_frame, text="Select existing", width=15)
-        btn_sel_config['command']= lambda: close_and_call(parent, load_conf)
+        btn_sel_config['command']= lambda: close_and_call(parent, activate_conf)
 
         sep = Separator(self)
         btn_run = Button(self, text="RUN this configuration", fg="green", width=default_btn_width)
@@ -591,8 +591,6 @@ class Run_config_frame(Frame):
             back_btn.pack()
         
     def update(self):
-        if state.all_finished_stage(1):
-            state.finished=True
         close_and_call(self, view_run_progress)
     
     def run_conf(self):
@@ -719,13 +717,23 @@ def dev_conf_to_str(dev_conf:Dev_config):
         txt +=f",{cca}"
     return txt
 
+def activate_conf():
+    """
+    Wrapper function load configuration
+    """
+    conf = load_conf()
+    if conf:
+        global active_config
+        active_config = conf
+    home()
+        
 
 def load_conf():
     """
     Asks for a configuration to open and puts it into active_config.
     """
-    f_loc = filedialog.askopenfilename(title = "Select file", filetypes = (("text files","*.txt"),("all files","*.*")))
-    if f_loc == '' or f_loc == (): home() #no file was selected
+    f_loc = filedialog.askopenfilename(title = "Select configuration file", filetypes = (("text files","*.txt"),("all files","*.*")))
+    if f_loc == '' or f_loc == (): return None #no file was selected
     else:
         f = open(f_loc, mode='r')
         line_1 = f.readline().split(',')
@@ -736,11 +744,10 @@ def load_conf():
                 2: load_v2,
                 3: load_v3,
             }
-            try: version_handlers[version](f, name, f_loc) #calls the handler belonging to the version number
+            try: return version_handlers[version](f, name, f_loc) #calls the handler belonging to the version number
             except KeyError: 
                 print("Invalid configuration version")
         except IndexError: print("Could not load configuration, reading of name and version failed")
-        home()
 
 #load_v* load a specific version
 def load_v1(f, name, f_loc):
@@ -764,9 +771,7 @@ def load_v1(f, name, f_loc):
             ccas.append(l[6+j])
         dev_conf = Dev_config(dev_name, length, None, None, addr, num_cca, ccas)
         dev_list.append(dev_conf)
-    conf = Config(name, f_loc, num_of_dev, dev_list)
-    global active_config
-    active_config = conf
+    return Config(name, f_loc, num_of_dev, dev_list)
 
 def load_v2(f, name, f_loc):
     num_of_dev = int(f.readline().split()[1])
@@ -787,9 +792,7 @@ def load_v2(f, name, f_loc):
             ccas.append(l[6+j])
         dev_conf = Dev_config(dev_name, length, None, None, addr, num_cca, ccas)
         dev_list.append(dev_conf)
-    conf = Config(name, f_loc, num_of_dev, dev_list)
-    global active_config
-    active_config = conf
+    return Config(name, f_loc, num_of_dev, dev_list)
 
 def load_v3(f, name, f_loc):
     num_of_dev = int(f.readline().split()[1])
@@ -813,9 +816,7 @@ def load_v3(f, name, f_loc):
             ccas.append(l[7+j])
         dev_conf = Dev_config(dev_name, length, trace_name, trace_handler, addr, num_cca, ccas)
         dev_list.append(dev_conf)
-    conf = Config(name, f_loc, num_of_dev, dev_list)
-    global active_config
-    active_config = conf
+    return Config(name, f_loc, num_of_dev, dev_list)
 
 def to_none(string:str):
     if string == 'None':

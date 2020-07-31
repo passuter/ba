@@ -33,8 +33,11 @@ class Dev_config:
     trace_name:str #name of the trace file
     trace_handler:str #name of the handler in trace_worker.py
     addr:tuple #address of the iperf server (ip, port)
+    src_ports:list #ports of the phone during iperf transmissions, used only in processing
     number_of_cca:int
     ccas:list #stringlist
+    #src_ports and ccas should never be reordered, as they will be matched by order during
+    #processing
 
     def __init__(self, dev_name, length, trace_name, trace_handler, addr, num_cca, ccas):
         self.name = dev_name
@@ -44,6 +47,7 @@ class Dev_config:
         self.addr = addr
         self.number_of_cca = num_cca
         self.ccas = ccas
+        self.src_ports = []
     
     def get_ip(self):
         ip, _ = self.addr
@@ -80,8 +84,8 @@ class State:
     dev_status:dict = dict() 
     status:dict = {
         0: "running",
-        1: "finished run",
-        2: "data pulled",
+        1: "finished run, now pulling data",
+        2: "data pulled, now processing",
         3: "data processed"
     }
 
@@ -99,6 +103,14 @@ class State:
             if self.dev_status[d] <= i:
                 run_complete = False
         return run_complete
+
+    def set_state(self, name:str, i:int):
+        """
+        Set state of device to i
+        """
+        self.dev_status[name] = i
+        if self.all_finished_stage(2):
+            self.finished = True
 
     def print_status(self):
         """
