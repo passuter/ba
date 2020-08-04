@@ -12,7 +12,7 @@ raw_res_fold:str
 res_fold:str = ""
 delete_files_after_processing:bool
 
-measuring_intervall = 0.1 #in seconds
+measuring_intervall = 0.25 #in seconds
 
 def init():
     """
@@ -29,13 +29,14 @@ factor = {
     "G": 10**9,
 }
 
-def begin_processing():
+def begin_processing(): 
     """
     Starts the processing of the data in a new thread
     """
     conf = server_frontend.active_config
     state = server_frontend.state
-    threading.Thread(target=start_processing, args=(conf, state)).start()
+    start_processing(conf, state)
+    #threading.Thread(target=start_processing, args=(conf, state)).start() #process on a different thread to not busy the server, but crashes
 
 def begin_processing_manual():
     """
@@ -44,9 +45,9 @@ def begin_processing_manual():
     init()
     args = sys.argv
     for arg in args:
-        if arg == '-no_del' or arg == '-nodel':
+        if arg == '-no_del' or arg == '-nodel' or arg == '-no_delete' or arg == '-nodelete':
             global delete_files_after_processing
-            delete_files_after_processing = False
+            delete_files_after_processing = True
             print("Not deleting files")
 
     conf = server_frontend.load_conf()
@@ -216,7 +217,7 @@ def process_pcap(src_file:str, test_name:str, phone_port:int, server_port:int):
                     #No packets were send, i.e. no retransmissions or detected loss
                     loss = 0.0
                 #print(f"Time: {tcp.time_relative}s, throughput: {throughput_KBps}KB/s, average RTT: {avg_rtt_ms}ms, loss: {loss}%\n")
-                res += f"{timestamp},{throughput_KBps},{avg_rtt_ms},{loss}\n"
+                res += f"{round(timestamp, 4)},{throughput_KBps},{avg_rtt_ms},{loss}\n"
 
                 #reset values for next period
                 ack_num = int(tcp.ack)

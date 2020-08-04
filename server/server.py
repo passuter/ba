@@ -212,7 +212,7 @@ def handle_msg10(msg_data, device:Device):
     send_msg(f",11,ack 01\n", device)
 
 def handle_msg21(msg_data, device):
-    print(f"{device.name} returned from a test run with:\n{msg_data}")
+    print(f"{device.name} returned from a test run")
     try:
         server_frontend.state.dev_status[device.name] = 1
     except KeyError: pass

@@ -11,7 +11,6 @@ from data_structures import *
 
 #Global variables
 print_error = print #global function for printing errors
-tmp_dir = "tmp/"
 traces:dict = dict() #mapping of traces files to Trace objects
 netem_thread = None
 iperf_processes = []
@@ -23,14 +22,8 @@ def setup():
     This function prepares the iperf server
     Returns True if it succeeded and False otherwise
     """
-    try: os.mkdir(tmp_dir) #create new temporary directory
-    except OSError:
-        print_error(["Could not create tmp directory"])
-        return False
     #Check if the shell can execute commands
     try:
-        #p = subprocess.Popen(['echo hello'], stdout=subprocess.PIPE, stderr = subprocess.STDOUT)
-        #out, err = p.communicate()
         out = execute("echo hello")
         if out != 'hello':
             print(f"Shell error, got {out}")
@@ -77,9 +70,9 @@ def netem_emulator(flow_mappings):
             trace = traces[trace_name]
             handleid = flowid[3:5]
             delay = trace.delay[i % (len(trace.delay))]
-            loss = trace.loss[i % (len(trace.loss))]
+            loss = int(trace.loss[i % (len(trace.loss))])
             rate = trace.rate[i % (len(trace.rate))]
-            cmd = f"sudo tc qdisc change dev {net_dev} parent {flowid} handle {handleid}: netem delay {delay} "
+            cmd = f"sudo tc qdisc change dev {net_dev} parent {flowid} handle {handleid}: netem delay {delay}ms "
             if loss != 0: cmd +=f"loss {loss}% "
             cmd += f"rate {rate}"
             out = execute(cmd)
@@ -173,8 +166,6 @@ def clear_setup():
     """
     Resets the setup of the iperf server. This should be called always when the active configuration changes to avoid inconsistency during the setup
     """
-    try: shutil.rmtree(tmp_dir) #delete all temporary files
-    except OSError: pass #print_error(["Error when deleting tmp dir"]) #debug only
     global netem_thread, traces, running
     netem_thread = None
     #remove the rules again
