@@ -64,7 +64,8 @@ def netem_emulator(flow_mappings):
     """
     i = 0
     #print(flow_mappings)
-    net_dev = server_frontend.server_settings.network_dev
+    #net_dev = server_frontend.server_settings.network_dev
+    net_dev = "ifb0"
     while running:
         for (trace_name, flowid) in flow_mappings:
             trace = traces[trace_name]
@@ -119,8 +120,14 @@ def generate_netem_cmd():
     network_dev = "eth0" #default ethernet
     if server_frontend.server_settings.network_dev != "":
         network_dev = server_frontend.server_settings.network_dev
-    #replace default root qdisc 
-    cmds = [f"sudo tc qdisc add dev {network_dev} handle 1: root htb"]
+    #replace default root qdisc
+    cmds = [
+        f"sudo tc qdisc add dev {network_dev} ingress",
+        f"sudo tc filter add dev {network_dev} parent ffff: protocol ip u32 match u32 0 0 flowid 1:1 action mirred egress redirect dev ifb0",
+        f"sudo tc qdisc add dev ifb0 handle 1: root htb"
+        ]
+    network_dev = "ifb0"
+    #cmds = [f"sudo tc qdisc add dev {network_dev} handle 1: root htb"]
     
     id_mapping = []
     i = 0
@@ -134,7 +141,7 @@ def generate_netem_cmd():
         cmds.append(f"sudo tc qdisc add dev {network_dev} parent {flow_id} handle {handleid}: netem delay 0 rate 10Gbps")
         #add a filter to match this device with the class
         device_ip, _ = server_frontend.get_dev_by_name(server_frontend.devices, d.name).addr
-        cmds.append(f"sudo tc filter add dev {network_dev} parent 1: protocol ip prio 1 u32 match ip dst {device_ip}/32 flowid {flow_id}")
+        cmds.append(f"sudo tc filter add dev {network_dev} parent 1: protocol ip prio 1 u32 match ip src {device_ip}/32 flowid {flow_id}")
         id_mapping.append((d.trace_name, flow_id))
         #print(id_mapping)
 
@@ -170,7 +177,12 @@ def clear_setup():
     netem_thread = None
     #remove the rules again
     try:
-        execute(f"sudo tc qdisc del dev {server_frontend.server_settings.network_dev} handle 1: root htb")
+        #execute(f"sudo tc qdisc del dev {server_frontend.server_settings.network_dev} handle 1: root htb")
+        cmds = [
+            f"sudo tc qdisc del dev ifb0 handle 1: root htb",
+            f"sudo tc qdisc del dev {server_frontend.server_settings.network_dev} ingress"
+        ]
+        execute_multiple(cmds)
     except FileNotFoundError:
         #FileNotFoundError occurrs when shel doesn't work (e.g. on windows)
         pass

@@ -19,7 +19,7 @@ def init():
     Initializes global variables
     """
     global raw_res_fold, delete_files_after_processing
-    delete_files_after_processing = True
+    delete_files_after_processing = False
     raw_res_fold = server.results_folder + "/"
 
 factor = {
@@ -28,6 +28,12 @@ factor = {
     "M": 10**6,
     "G": 10**9,
 }
+
+def empty_tcp_line(timestamp, separator):
+    """
+    Helper function to create an entry for tcp analysis should no data be available
+    """
+    return f"{timestamp},0,0,0{separator}"
 
 def begin_processing(): 
     """
@@ -49,6 +55,9 @@ def begin_processing_manual():
             global delete_files_after_processing
             delete_files_after_processing = True
             print("Not deleting files")
+        elif arg == '-combine' or arg == '-comb':
+            combine(args)
+            return
 
     conf = server_frontend.load_conf()
     if not conf:
@@ -128,6 +137,7 @@ def process_tcp_dump(conf:Config, state:State):
     """
     Processes the tcpdump file of each device.
     """
+    processed_files = []
     for dev_conf in conf.dev_configs:
         test_name = f"{conf.name}_{dev_conf.name}_"
         _, server_port = dev_conf.addr
@@ -140,11 +150,14 @@ def process_tcp_dump(conf:Config, state:State):
             f = open(res_file_name, mode='w')
             f.write(res.strip())
             f.close()
+            processed_files.append(res_file_name)
             if delete_files_after_processing:
                 os.remove(src_file)
             print(f"Processed {test_name_cca}")
         state.set_state(dev_conf.name, 3)
         print(f"Device {dev_conf.name} data has been processed")
+    combined_output = f"{res_fold}{conf.name}_combined.csv"
+    combine_files(processed_files, combined_output)
             
 
 def process_pcap(src_file:str, test_name:str, phone_port:int, server_port:int):
@@ -204,7 +217,7 @@ def process_pcap(src_file:str, test_name:str, phone_port:int, server_port:int):
                 mod_time_passed = time_passed - measuring_intervall
                 while mod_time_passed >= measuring_intervall:
                     #entering this loop means more than one intervall passed, the previous ones are zeroed
-                    res += f"{timestamp},0,0,0\n"
+                    res += empty_tcp_line(timestamp, f"\n")
                     timestamp += measuring_intervall
                     mod_time_passed -= measuring_intervall
                 bytes_acked = int(tcp.ack) - ack_num
@@ -221,6 +234,7 @@ def process_pcap(src_file:str, test_name:str, phone_port:int, server_port:int):
 
                 #reset values for next period
                 ack_num = int(tcp.ack)
+                print(rtts)
                 rtts = []
                 pkt_num = 0
                 num_retransmits = 0
@@ -248,6 +262,60 @@ def create_res_folder(name:str, i:int):
         res_fold = dir
     except OSError:
         create_res_folder(name, i+1)
+
+def combine(args):
+    """
+    Helper function that combines results from different runs into a single file (tcpdump results only)
+    """
+    file_names = []
+    file_names_reading = False
+    output_name = ""
+    output_name_reading = False
+
+    for arg in args:
+        if arg == "-combine" or arg == "-comb":
+            file_names_reading = True
+            output_name_reading = False
+        elif arg == "-out":
+            output_name_reading = True
+            file_names_reading = False
+        elif file_names_reading:
+            file_names.append(arg)
+        elif output_name_reading:
+            output_name = arg
+    
+    if not file_names: return
+    if output_name == "":
+        output_name = raw_res_fold + "combine_tmp.txt"
+    combine_files(file_names, output_name)
+    #print(f"Files: {file_names}")
+    #print(f"Out: {output_name}")
+
+def combine_files(file_names, output_name):
+    input = []
+    max_lines = -1
+    for name in file_names:
+        f = open(name, mode='r')
+        lines = f.readlines()
+        max_lines = max(max_lines, len(lines))
+        input.append(lines)
+
+    res = ""
+    for i in range(max_lines):
+        for lines in input:
+            try:
+                l = lines[i].strip()
+                res += f"{l},"
+            except IndexError:
+                timestamp = (i-1) * measuring_intervall
+                res += empty_tcp_line(timestamp, ",")
+        res += f"\n"
+    
+    f = open(output_name, mode='w')
+    f.write(res)
+    f.close()
+
+
 
 if __name__ == "__main__":
     begin_processing_manual()

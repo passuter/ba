@@ -1,3 +1,0 @@
-Loss20, Version 3
-Number_of_devices: 1
-Redmi4A,15,/home/suter/Documents/ba/git/ba/server/loss_traces/loss_20,txt,192.168.1.127,5201,2,cubic,reno
