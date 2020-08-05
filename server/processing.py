@@ -19,7 +19,8 @@ def init():
     Initializes global variables
     """
     global raw_res_fold, delete_files_after_processing
-    delete_files_after_processing = False
+    delete_files_after_processing = False #if False, raw data (.pcap files etc) will be kept
+    #However, running a test might override those files
     raw_res_fold = server.results_folder + "/"
 
 factor = {
@@ -234,7 +235,6 @@ def process_pcap(src_file:str, test_name:str, phone_port:int, server_port:int):
 
                 #reset values for next period
                 ack_num = int(tcp.ack)
-                print(rtts)
                 rtts = []
                 pkt_num = 0
                 num_retransmits = 0
