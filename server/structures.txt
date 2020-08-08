@@ -6,8 +6,8 @@ Types of messages, all messages start with a leading ',', as phone might write c
 10: Initialization of a new device. Structure: name:string,CCA_1:string,CCA_2:string,...
 11: Ack of 10
 20: Server sends configuration. Structure:config_name:string,dev_name:string,length:int,trace,IP,PORT,number_of_CCA:int,CCA1,CCA2,...
-21: Response of 20. number_files says in how many files the results are saved. 0 for error
-Structure: number_files:int,file1:string,file2:string,...
+21: Response of 20(after test completed). number_files says in how many files the results are saved. 0 for error
+Structure: number_files:int,
 
 
 

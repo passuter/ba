@@ -2,6 +2,7 @@ import time
 import queue
 from tkinter import *
 from tkinter import filedialog
+from datetime import datetime
 import socket
 
 import server, iperf_server, trace_worker
@@ -384,7 +385,7 @@ class Mod_config_frame(Frame):
 
         count = 0 #counts number of CCAs displayed
         max_displ = 5
-        text = f"Device Name: {dev_conf.name}\nRuntime: {dev_conf.length}s\nIperf Address: {dev_conf.addr}\nTrace: {dev_conf.get_trace_name()}\nCCAs (shows maximal {max_displ}):"
+        text = f"Device Name: {dev_conf.name}\nRuntime: {dev_conf.length}s\nBattery test: {dev_conf.is_battery_test}\nIperf Address: {dev_conf.addr}\nTrace: {dev_conf.get_trace_name()}\nCCAs (shows maximal {max_displ}):"
         for cca in dev_conf.ccas:
             count += 1
             if count > max_displ: break
@@ -424,28 +425,31 @@ class Mod_dev_config_frame(Frame):
         #Frame to hold entry boxes to enter the config of the device
         #expose entries with self to functions in class
         lhs = Frame(self)
-        length_lbl = Label(lhs, text="Enter length of test in seconds")
+        length_lbl = Label(lhs, text="Enter length of test (default in seconds)")
         length_lbl.grid(row=0, column=0)
         self.length_entry = Entry(lhs)
         self.length_entry.grid(row=0, column=1)
         self.length_entry.insert(END, device_config.length)
+        self.battery_var = IntVar(value=int(self.dev_conf.is_battery_test))
+        checkbtn = Checkbutton(lhs, text="Battery test", variable=self.battery_var)
+        checkbtn.grid(row=1)
         trace_txt1 = f"Selected trace file:\n{device_config.get_trace_name()}"
         trace_lbl = Label(lhs, text=trace_txt1)
-        trace_lbl.grid(row=1)
+        trace_lbl.grid(row=2)
         trace_lbl2 = Label(lhs, text=f"Handler: {device_config.trace_handler}")
-        trace_lbl2.grid(row=2, column=0)
+        trace_lbl2.grid(row=3, column=0)
         trace_select_btn = Button(lhs, text="Select trace", command=self.select_trace)
-        trace_select_btn.grid(row=2, column=1)
+        trace_select_btn.grid(row=3, column=1)
         ip, port = device_config.addr
         ip_lbl = Label(lhs, text="Enter ip of iperf server")
-        ip_lbl.grid(row=3, column=0)
+        ip_lbl.grid(row=4, column=0)
         self.ip_entry = Entry(lhs)
-        self.ip_entry.grid(row=3, column=1)
+        self.ip_entry.grid(row=4, column=1)
         self.ip_entry.insert(END, ip)
         port_lbl = Label(lhs, text="Enter port of iperf server")
-        port_lbl.grid(row=4, column=0)
+        port_lbl.grid(row=5, column=0)
         self.port_entry = Entry(lhs)
-        self.port_entry.grid(row=4, column=1)
+        self.port_entry.grid(row=5, column=1)
         self.port_entry.insert(END, port)
 
         #Frame to hold lisbox widget to select the CCAs
@@ -470,18 +474,41 @@ class Mod_dev_config_frame(Frame):
         Returns true if the config was modified, false if an entry was nonvalid
         """
         correct_values = True
-        try: length = int(self.length_entry.get())
-        except ValueError: print("Invalid entry for length, must be a single integer strictly larger than 0"); correct_values = False    
+        try:
+            length_raw = self.length_entry.get().split()
+            if len(length_raw) == 1:
+                length_factor = 1
+            elif len(length_raw) == 2:
+                unit = length_raw[1].strip()
+                if unit == "s" or unit == "second" or unit == "seconds":
+                    length_factor = 1
+                elif unit == "min" or unit == "minute" or unit == "minutes":
+                    length_factor = 60
+                elif unit == "h" or unit == "hour" or unit == "hours":
+                    length_factor = 3600
+                else:
+                    raise ValueError()
+            else:
+                raise ValueError()
+            length = int(length_raw[0]) * length_factor
+
+        except ValueError:
+            print("Invalid entry for length, must be a integer strictly larger than 0 with an optional time unit (s, min, h) seperated by whitespace")
+            correct_values = False    
         ip = self.ip_entry.get()
-        try: port = int(self.port_entry.get())
-        except ValueError: print("Invalid entry for port, must be a single integer"); correct_values = False
+        try:
+            port = int(self.port_entry.get())
+        except ValueError:
+            print("Invalid entry for port, must be a single integer")
+            correct_values = False
         indices = self.lb.curselection()
         ccas = []
         for i in indices:
             ccas.append(self.lb.get(i))
         
         if correct_values:
-            dev_config = Dev_config(self.dev_name, length, self.dev_conf.trace_name, self.dev_conf.trace_handler, (ip, port), len(ccas), ccas)
+            is_battery_test = bool(self.battery_var.get())
+            dev_config = Dev_config(self.dev_name, length, is_battery_test, self.dev_conf.trace_name, self.dev_conf.trace_handler, (ip, port), len(ccas), ccas)
             if is_valid_dev_config(dev_config):
                 #remove duplicate
                 for d in active_config.dev_configs:
@@ -564,7 +591,17 @@ class Run_config_frame(Frame):
     def __init__(self, parent):
         Frame.__init__(self, parent, width=window_width, height=window_height)
         self.pack(fill=BOTH)
-        run_info = f"Test name: {active_config.name}"
+        #Get information about starttime and runtime
+        current_time = datetime.now().strftime("%H:%M:%S")
+        max_time = 0
+        for dev_conf in active_config.dev_configs:
+            max_time = max(max_time, dev_conf.length * dev_conf.number_of_cca)
+        if max_time > 60:
+            time_unit = "minutes"
+            max_time = round(max_time/60, 1)
+        else:
+            time_unit = "seconds"
+        run_info = f"Test name: {active_config.name}\nStarttime: {current_time}, minimal runtime: {max_time} {time_unit}"
         lbl_top = Label(self, text=run_info)
         lbl_top.pack(side=TOP)
 
@@ -670,7 +707,7 @@ def add_dev_config2():
     if index == -1: mod_config() #no device selected, return to modify configuration screen
     else:
         dev = devices[index]
-        conf = Dev_config(dev.name, 0, None, None, (server_settings.ip, 0), 0, [])
+        conf = Dev_config(dev.name, 0, False, None, None, (server_settings.ip, 0), 0, [])
         mod_dev_config(dev, conf)
 
 def start_run():
@@ -702,7 +739,7 @@ def save_conf():
     """
     f = open(active_config.location, 'w')
     #txt = f"{active_config['name']}, Version 1\nServer_settings:tbd\nNumber_of_devices: {active_config['num_of_dev']}\n"
-    txt = f"{active_config.name}, Version 3\nNumber_of_devices: {active_config.num_of_dev}\n"
+    txt = f"{active_config.name}, Version 4\nNumber_of_devices: {active_config.num_of_dev}\n"
     for d in active_config.dev_configs:
         txt += dev_conf_to_str(d) + f"\n"
     f.write(txt)
@@ -712,7 +749,7 @@ def dev_conf_to_str(dev_conf:Dev_config):
     Writes the device configuration into a string (ends it with newline)
     """
     ip, port = dev_conf.addr
-    txt = f"{dev_conf.name},{dev_conf.length},{dev_conf.trace_name},{dev_conf.trace_handler},{ip},{port},{dev_conf.number_of_cca}"
+    txt = f"{dev_conf.name},{dev_conf.length},{dev_conf.is_battery_test},{dev_conf.trace_name},{dev_conf.trace_handler},{ip},{port},{dev_conf.number_of_cca}"
     for cca in dev_conf.ccas:
         txt +=f",{cca}"
     return txt
@@ -740,9 +777,8 @@ def load_conf():
         try:
             name, version = line_1[0], int(line_1[1].split()[1]) #reads name & version number of the configuration file
             version_handlers = {
-                1: load_v1,
-                2: load_v2,
                 3: load_v3,
+                4: load_v4,
             }
             try: return version_handlers[version](f, name, f_loc) #calls the handler belonging to the version number
             except KeyError: 
@@ -750,49 +786,6 @@ def load_conf():
         except IndexError: print("Could not load configuration, reading of name and version failed")
 
 #load_v* load a specific version
-def load_v1(f, name, f_loc):
-    #used to load older files
-    server_sett = f.readline() #reads the serversettings, deprecated
-    num_of_dev = int(f.readline().split()[1])
-    dev_list = []
-    for i in range(num_of_dev):
-        l = f.readline()
-        if l == '': #file ended early
-            print("Configuration file corrupted: Less devices than specified")
-            home()
-        l = l.rstrip().split(',') #remove tailing newline & split by ','
-        dev_name = l[0]
-        length = int(l[1])
-        trace = l[2]
-        addr = (l[3], int(l[4]))
-        num_cca = int(l[5])
-        ccas = []
-        for j in range(num_cca):
-            ccas.append(l[6+j])
-        dev_conf = Dev_config(dev_name, length, None, None, addr, num_cca, ccas)
-        dev_list.append(dev_conf)
-    return Config(name, f_loc, num_of_dev, dev_list)
-
-def load_v2(f, name, f_loc):
-    num_of_dev = int(f.readline().split()[1])
-    dev_list = []
-    for i in range(num_of_dev):
-        l = f.readline()
-        if l == '': #file ended early
-            print("Configuration file corrupted: Less devices than specified")
-            home()
-        l = l.rstrip().split(',') #remove tailing newline & split by ','
-        dev_name = l[0]
-        length = int(l[1])
-        trace = l[2]
-        addr = (l[3], int(l[4]))
-        num_cca = int(l[5])
-        ccas = []
-        for j in range(num_cca):
-            ccas.append(l[6+j])
-        dev_conf = Dev_config(dev_name, length, None, None, addr, num_cca, ccas)
-        dev_list.append(dev_conf)
-    return Config(name, f_loc, num_of_dev, dev_list)
 
 def load_v3(f, name, f_loc):
     num_of_dev = int(f.readline().split()[1])
@@ -814,7 +807,32 @@ def load_v3(f, name, f_loc):
         ccas = []
         for j in range(num_cca):
             ccas.append(l[7+j])
-        dev_conf = Dev_config(dev_name, length, trace_name, trace_handler, addr, num_cca, ccas)
+        dev_conf = Dev_config(dev_name, length, False, trace_name, trace_handler, addr, num_cca, ccas)
+        dev_list.append(dev_conf)
+    return Config(name, f_loc, num_of_dev, dev_list)
+
+def load_v4(f, name, f_loc):
+    num_of_dev = int(f.readline().split()[1])
+    dev_list = []
+    for i in range(num_of_dev):
+        l = f.readline()
+        if l == '': #file ended early
+            print("Configuration file corrupted: Less devices than specified")
+            home()
+        l = l.rstrip().split(',') #remove tailing newline & split by ','
+        dev_name = l[0]
+        length = int(l[1])
+        is_battery_test = l[2] == "True"
+        trace_name = l[3]
+        trace_name = to_none(trace_name)
+        trace_handler = l[4]
+        trace_handler = to_none(trace_handler)
+        addr = (l[5], int(l[6]))
+        num_cca = int(l[7])
+        ccas = []
+        for j in range(num_cca):
+            ccas.append(l[8+j])
+        dev_conf = Dev_config(dev_name, length, is_battery_test, trace_name, trace_handler, addr, num_cca, ccas)
         dev_list.append(dev_conf)
     return Config(name, f_loc, num_of_dev, dev_list)
 

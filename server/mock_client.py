@@ -50,11 +50,14 @@ def handle_msg11(msg):
 def handle_msg20(msg):
     conf_name = msg[0]
     length = int(msg[1])
-    addr = (msg[2],int(msg[3]))
-    num_cca = int(msg[4])
-    ccas = msg[5:5+num_cca]
+    is_battery = bool(msg[2] == "True")
+    addr = (msg[3],int(msg[4]))
+    num_cca = int(msg[5])
+    ccas = msg[6:6+num_cca]
     print(f"I received configuration {conf_name}")
     print(f"Length: {length}s, Address: {addr}, CCAs: {ccas}\n")
+    if is_battery:
+        print(f"This is a battery test")
     sleep(2)
     send_msg.append(bytes(f",21,{conf_name}", encoding='utf-8'))
 

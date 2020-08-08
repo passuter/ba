@@ -75,6 +75,7 @@ def start_processing(conf, state):
     create_res_folder(conf.name, 0)
     process_iperf_res(conf, state)
     process_tcp_dump(conf, state)
+    process_battery_results(conf, state)
 
 def process_iperf_res(config:Config, state:State):
     """
@@ -140,6 +141,8 @@ def process_tcp_dump(conf:Config, state:State):
     """
     processed_files = []
     for dev_conf in conf.dev_configs:
+        if dev_conf.is_battery_test:
+            continue #a battery test has no tcp dump files
         test_name = f"{conf.name}_{dev_conf.name}_"
         _, server_port = dev_conf.addr
         for i in range(dev_conf.number_of_cca):
@@ -159,7 +162,15 @@ def process_tcp_dump(conf:Config, state:State):
         print(f"Device {dev_conf.name} data has been processed")
     combined_output = f"{res_fold}{conf.name}_combined.csv"
     combine_files(processed_files, combined_output)
-            
+
+def process_battery_results(conf:Config, state:State):
+    """
+    Processes the battery result files
+    """
+    for dev_conf in conf.dev_configs:
+        if not dev_conf.is_battery_test:
+            continue #only process battery tests
+        #TODO
 
 def process_pcap(src_file:str, test_name:str, phone_port:int, server_port:int):
     """
@@ -218,7 +229,7 @@ def process_pcap(src_file:str, test_name:str, phone_port:int, server_port:int):
                 mod_time_passed = time_passed - measuring_intervall
                 while mod_time_passed >= measuring_intervall:
                     #entering this loop means more than one intervall passed, the previous ones are zeroed
-                    res += empty_tcp_line(timestamp, f"\n")
+                    res += empty_tcp_line(timestamp, f",\n")
                     timestamp += measuring_intervall
                     mod_time_passed -= measuring_intervall
                 bytes_acked = int(tcp.ack) - ack_num
@@ -231,7 +242,7 @@ def process_pcap(src_file:str, test_name:str, phone_port:int, server_port:int):
                     #No packets were send, i.e. no retransmissions or detected loss
                     loss = 0.0
                 #print(f"Time: {tcp.time_relative}s, throughput: {throughput_KBps}KB/s, average RTT: {avg_rtt_ms}ms, loss: {loss}%\n")
-                res += f"{round(timestamp, 4)},{throughput_KBps},{avg_rtt_ms},{loss}\n"
+                res += f"{round(timestamp, 4)},{throughput_KBps},{avg_rtt_ms},{loss},\n"
 
                 #reset values for next period
                 ack_num = int(tcp.ack)
@@ -288,8 +299,7 @@ def combine(args):
     if output_name == "":
         output_name = raw_res_fold + "combine_tmp.txt"
     combine_files(file_names, output_name)
-    #print(f"Files: {file_names}")
-    #print(f"Out: {output_name}")
+
 
 def combine_files(file_names, output_name):
     input = []
@@ -305,7 +315,7 @@ def combine_files(file_names, output_name):
         for lines in input:
             try:
                 l = lines[i].strip()
-                res += f"{l},"
+                res += l
             except IndexError:
                 timestamp = (i-1) * measuring_intervall
                 res += empty_tcp_line(timestamp, ",")

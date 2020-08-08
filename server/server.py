@@ -133,7 +133,7 @@ def dev_conf_to_str(dev_conf:Dev_config):
     Writes the device configuration into a string (ends it with newline), ignores traces & name of the device
     """
     ip, port = dev_conf.addr
-    txt = f"{dev_conf.length},{ip},{port},{dev_conf.number_of_cca}"
+    txt = f"{dev_conf.length},{dev_conf.is_battery_test},{ip},{port},{dev_conf.number_of_cca}"
     for cca in dev_conf.ccas:
         txt +=f",{cca}"
     return txt
@@ -212,9 +212,18 @@ def handle_msg10(msg_data, device:Device):
     send_msg(f",11,ack 01\n", device)
 
 def handle_msg21(msg_data, device):
-    print(f"{device.name} returned from a test run")
+    try: 
+        num_of_files = int(msg_data[0])
+        if num_of_files == 0:
+            raise ValueError("Returned with an error")
+        print(f"{device.name} returned from a test run")
+        dev_status = 1
+    except:
+        print(f"{device.name} encountered an error during a test run")
+        dev_status = -1
+
     try:
-        server_frontend.state.dev_status[device.name] = 1
+        server_frontend.state.dev_status[device.name] = dev_status
     except KeyError: pass
     if server_frontend.state.all_finished_stage(0):
         iperf_server.stop_emulating()

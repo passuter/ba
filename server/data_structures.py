@@ -30,6 +30,7 @@ class Config:
 class Dev_config:
     name:str #name of the device
     length:int #length of the test
+    is_battery_test:bool #type of test, Battery or not
     trace_name:str #name of the trace file
     trace_handler:str #name of the handler in trace_worker.py
     addr:tuple #address of the iperf server (ip, port)
@@ -39,9 +40,10 @@ class Dev_config:
     #src_ports and ccas should never be reordered, as they will be matched by order during
     #processing
 
-    def __init__(self, dev_name, length, trace_name, trace_handler, addr, num_cca, ccas):
+    def __init__(self, dev_name, length, is_battery_test, trace_name, trace_handler, addr, num_cca, ccas):
         self.name = dev_name
         self.length = length
+        self.is_battery_test = is_battery_test
         self.trace_name = trace_name
         self.trace_handler = trace_handler
         self.addr = addr
@@ -83,6 +85,7 @@ class State:
     #maps a device to a status
     dev_status:dict = dict() 
     status:dict = {
+        -1: "error",
         0: "running",
         1: "finished run, now pulling data",
         2: "data pulled, now processing",

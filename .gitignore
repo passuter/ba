@@ -2,5 +2,6 @@
 /iperf
 /iperf_jni
 /server/__pycache__
-/Test_results
 /server/Test_result
+/server/server_settings.txt
+/Test_results
