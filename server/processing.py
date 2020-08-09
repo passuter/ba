@@ -19,7 +19,7 @@ def init():
     Initializes global variables
     """
     global raw_res_fold, delete_files_after_processing
-    delete_files_after_processing = False #if False, raw data (.pcap files etc) will be kept
+    delete_files_after_processing = True #if False, raw data (.pcap files etc) will be kept
     #However, running a test might override those files
     raw_res_fold = server.results_folder + "/"
 
@@ -42,8 +42,8 @@ def begin_processing():
     """
     conf = server_frontend.active_config
     state = server_frontend.state
-    start_processing(conf, state)
-    #threading.Thread(target=start_processing, args=(conf, state)).start() #process on a different thread to not busy the server, but crashes
+    process(conf, state)
+    #threading.Thread(target=process, args=(conf, state)).start() #process on a different thread to not busy the server, but crashes
 
 def begin_processing_manual():
     """
@@ -69,13 +69,19 @@ def begin_processing_manual():
     state.pull_complete = True
     for dev_conf in conf.dev_configs:
         state.dev_status[dev_conf.name] = 2
-    start_processing(conf, state)
+    process(conf, state)
 
-def start_processing(conf, state):
+def process(conf, state):
     create_res_folder(conf.name, 0)
     process_iperf_res(conf, state)
     process_tcp_dump(conf, state)
     process_battery_results(conf, state)
+    if delete_files_after_processing:
+        try:
+            os.remove(raw_res_fold + "res_id.txt")
+        except:
+            pass
+    print(f"Finished processing data for test {conf.name}")
 
 def process_iperf_res(config:Config, state:State):
     """
@@ -277,6 +283,7 @@ def process_battery_results(conf:Config, state:State):
             f.close()
             if delete_files_after_processing:
                 os.remove(src_file)
+        state.set_state(dev_conf.name, 3)
         
     #combine & write results
     max_lines = 0

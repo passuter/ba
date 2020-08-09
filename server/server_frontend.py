@@ -600,7 +600,11 @@ class Run_config_frame(Frame):
             max_time = round(max_time/60, 1)
         else:
             time_unit = "seconds"
-        run_info = f"Test name: {active_config.name}\nStarttime: {state.starttime}, minimal runtime: {max_time} {time_unit}"
+        if state.started:
+            starttime = state.starttime
+        else:
+            starttime = "Not started"
+        run_info = f"Test name: {active_config.name}\nStarttime: {starttime}, minimal runtime: {max_time} {time_unit}"
         lbl_top = Label(self, text=run_info)
         lbl_top.pack(side=TOP)
 
