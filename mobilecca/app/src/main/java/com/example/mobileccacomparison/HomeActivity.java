@@ -18,10 +18,10 @@ public class HomeActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_home);
-        String txt_name = "Device name: " + Config.current.name;
+        String txt_name = "Device name: " + Settings.current.name;
         TextView textViewName = findViewById(R.id.textViewName);
         textViewName.setText(txt_name);
-        String txt_addr = "Server address: (" + Config.current.ip + ", " + Config.current.port + ")";
+        String txt_addr = "Server address: (" + Settings.current.ip + ", " + Settings.current.port + ")";
         TextView textViewAddr = findViewById(R.id.textViewAddr);
         textViewAddr.setText(txt_addr);
 
@@ -37,7 +37,7 @@ public class HomeActivity extends AppCompatActivity {
     }
 
     public void onConnect(View view) {
-        if (!Config.isValid()) {
+        if (!Settings.isValid()) {
             q.offer("No configuration set, cannot connect to server");
             return;
         }

@@ -9,24 +9,26 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 
-public class Config {
-    public static Config current;
+public class Settings {
+    public static Settings current;
 
     public static final String default_name = "No_name";
 
     public String name;
     public String ip;
     public int port;
+    public int battery_measurement_interval; //wait time between measurements in seconds
     public String[] cca;
 
-    public Config() {
-        this(default_name, "0.0.0.0", 0, new String[0]);
+    public Settings() {
+        this(default_name, "0.0.0.0", 0, 60, new String[0]);
     }
 
-    public Config(String name, String ip, int port, String[] congestion_algos) {
+    public Settings(String name, String ip, int port, int battery_measurement_interval, String[] congestion_algos) {
         this.name = name;
         this.ip = ip;
         this.port = port;
+        this.battery_measurement_interval = battery_measurement_interval;
         this.cca = congestion_algos;
     }
 
@@ -53,8 +55,8 @@ public class Config {
      * @param context
      * @return Config loaded from config.txt or the default Config should the load fail
      */
-    public static Config load_config(Context context) {
-        Config conf;
+    public static Settings load_config(Context context) {
+        Settings conf;
         try {
             FileInputStream fIn = context.openFileInput("config.txt");
             InputStreamReader isr = new InputStreamReader(fIn);
@@ -65,13 +67,17 @@ public class Config {
             String name = lines[0];
             String ip = lines[1];
             int port = Integer.parseInt(lines[2]);
-            String[] ccas = Util.get_cca();
-            for (int i = 0; i < ccas.length; i++) {
-                ccas[i] = ccas[i].trim();
+            int measuring_interval;
+            try {
+                measuring_interval = Integer.parseInt(lines[3]);
+            } catch (Exception e) {
+                //could not read measuring interval, set to default
+                measuring_interval = 60;
             }
-            conf = new Config(name, ip, port, ccas);
+            String[] ccas = Util.get_cca();
+            conf = new Settings(name, ip, port, measuring_interval, ccas);
         } catch (IOException e) {
-            conf = new Config();
+            conf = new Settings();
         }
         return conf;
     }
@@ -85,9 +91,10 @@ public class Config {
             FileOutputStream fOut = context.openFileOutput("config.txt", Context.MODE_PRIVATE);
             OutputStreamWriter osw = new OutputStreamWriter(fOut);
             StringBuilder sb = new StringBuilder();
-            sb.append(Config.current.name).append("\n");
-            sb.append(Config.current.ip).append("\n");
-            sb.append(Config.current.port).append("\n");
+            sb.append(Settings.current.name).append("\n");
+            sb.append(Settings.current.ip).append("\n");
+            sb.append(Settings.current.port).append("\n");
+            sb.append(Settings.current.battery_measurement_interval).append("\n");
             String data = sb.toString();
             osw.write(data);
             osw.close();

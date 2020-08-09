@@ -223,7 +223,7 @@ def handle_msg21(msg_data, device):
         dev_status = -1
 
     try:
-        server_frontend.state.dev_status[device.name] = dev_status
+        server_frontend.state.set_state(device.name, dev_status)
     except KeyError: pass
     if server_frontend.state.all_finished_stage(0):
         iperf_server.stop_emulating()

@@ -16,13 +16,14 @@ public class ChangeConfigActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_change_config);
         EditText dev_name = findViewById(R.id.editDevName);
-        String name = Config.current.name;
+        String name = Settings.current.name;
         dev_name.setText(name);
         EditText ip = findViewById(R.id.editIP);
-        ip.setText(Config.current.ip);
-
+        ip.setText(Settings.current.ip);
         EditText port = findViewById(R.id.editPort);
-        port.setText(Integer.toString(Config.current.port));
+        port.setText(Integer.toString(Settings.current.port));
+        EditText battery = findViewById(R.id.editBtry);
+        battery.setText(Integer.toString(Settings.current.battery_measurement_interval));
 
     }
 
@@ -49,14 +50,31 @@ public class ChangeConfigActivity extends AppCompatActivity {
             ERROR_MESSAGE = "Invalid port number, has to be between 0 and " + Util.MAX_PORT + ", was " + port;
             error_occurred = true;
         }
+        int battery_interval = -1;
+        try {
+            EditText btry_edit = findViewById(R.id.editBtry);
+            String battery_interval_raw = btry_edit.getText().toString();
+            battery_interval = Integer.parseInt(battery_interval_raw);
+            if (battery_interval <= 0) {
+                throw new RuntimeException();
+            }
+        } catch (RuntimeException e) {
+            String error_msg = "Entered value for battery_interval is invalid, must be integer > 0";
+            if (error_occurred) {
+                ERROR_MESSAGE = ERROR_MESSAGE + "\n" + error_msg; //append second error message to first
+            } else {
+                ERROR_MESSAGE = error_msg;
+                error_occurred = true;
+            }
+        }
 
         if (error_occurred) {
             Intent error_intent = new Intent(this, ChangeConfigErrorActivity.class);
             startActivity(error_intent);
         } else {
             String[] cca = Util.get_cca();
-            Config.current = new Config(name, ip, port, cca);
-            Config.save_config(this);
+            Settings.current = new Settings(name, ip, port, battery_interval, cca);
+            Settings.save_config(this);
 
             Intent home = new Intent(this, HomeActivity.class);
             startActivity(home);

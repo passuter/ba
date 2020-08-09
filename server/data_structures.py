@@ -1,4 +1,5 @@
 from os import path
+from datetime import datetime
 
 class Device:
     socket = None
@@ -79,6 +80,7 @@ class Trace:
 
 class State:
     started:bool = False
+    starttime:str
     pull_complete:bool = False
     finished:bool = False
     config_name:str
@@ -107,11 +109,15 @@ class State:
                 run_complete = False
         return run_complete
 
-    def set_state(self, name:str, i:int):
+    def start(self):
+        self.started = True
+        self.starttime = datetime.now().strftime("%H:%M:%S")
+
+    def set_state(self, dev_name:str, i:int):
         """
         Set state of device to i
         """
-        self.dev_status[name] = i
+        self.dev_status[dev_name] = i
         if self.all_finished_stage(2):
             self.finished = True
 

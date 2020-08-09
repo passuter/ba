@@ -1,17 +1,11 @@
 package com.example.mobileccacomparison;
 
-import java.io.BufferedInputStream;
 import java.io.BufferedReader;
-import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.Socket;
-import java.net.SocketException;
 import java.net.SocketTimeoutException;
-import java.net.UnknownHostException;
-import java.util.concurrent.BlockingDeque;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class Connection extends Thread{
@@ -92,14 +86,14 @@ public class Connection extends Thread{
         BufferedReader recv = null;
         DataOutputStream send = null;
         try {
-            socket = new Socket(Config.current.ip, Config.current.port);
+            socket = new Socket(Settings.current.ip, Settings.current.port);
             send = new DataOutputStream(socket.getOutputStream());
             recv = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             socket.setSoTimeout(500);
             //queue.offer("Socket established"); //debug only
 
             String line = "";
-            send.writeUTF(",10," + Config.asString());
+            send.writeUTF(",10," + Settings.asString());
 
             while (running) {
                 try {

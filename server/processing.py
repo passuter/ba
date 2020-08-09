@@ -145,6 +145,11 @@ def process_tcp_dump(conf:Config, state:State):
             continue #a battery test has no tcp dump files
         test_name = f"{conf.name}_{dev_conf.name}_"
         _, server_port = dev_conf.addr
+        if not dev_conf.number_of_cca == len(dev_conf.src_ports):
+            #number of ports and number of ccas do not match, cannot process this device
+            #can happen for example if phone could not connect to iperf server, then the iperf file cannot be read completely
+            state.set_state(dev_conf.name, -1)
+            continue
         for i in range(dev_conf.number_of_cca):
             src_file = raw_res_fold + dev_conf.name + f"_dump_run{i}.pcap"
             src_port = dev_conf.src_ports[i]
@@ -163,14 +168,6 @@ def process_tcp_dump(conf:Config, state:State):
     combined_output = f"{res_fold}{conf.name}_combined.csv"
     combine_files(processed_files, combined_output)
 
-def process_battery_results(conf:Config, state:State):
-    """
-    Processes the battery result files
-    """
-    for dev_conf in conf.dev_configs:
-        if not dev_conf.is_battery_test:
-            continue #only process battery tests
-        #TODO
 
 def process_pcap(src_file:str, test_name:str, phone_port:int, server_port:int):
     """
@@ -259,6 +256,53 @@ def process_pcap(src_file:str, test_name:str, phone_port:int, server_port:int):
             except:
                 pass
         
+    return res
+
+
+def process_battery_results(conf:Config, state:State):
+    """
+    Processes the battery result files
+    """
+    #read results from file into accumulator
+    res = [] #accumulator for results
+    for dev_conf in conf.dev_configs:
+        if not dev_conf.is_battery_test:
+            continue #only process battery tests
+        test_name = f"{conf.name}_{dev_conf.name}_"
+        for i in range(dev_conf.number_of_cca):
+            src_file = f"{raw_res_fold}{dev_conf.name}_battery_run{i}.txt"
+            test_name_cca = test_name + dev_conf.ccas[i]
+            f = open(src_file, mode="r")
+            res.append(process_battery_file(f, test_name_cca))
+            f.close()
+            if delete_files_after_processing:
+                os.remove(src_file)
+        
+    #combine & write results
+    max_lines = 0
+    for lines in res:
+        max_lines = max(max_lines, len(lines))
+    
+    res_txt = ""
+    for i in range(max_lines):
+        for j in range(len(res)):
+            try:
+                res_txt += res[j][i]
+            except IndexError:
+                #Some test might have different length, add all zeros
+                res_txt += "0,0,0,"
+        res_txt += f"\n"
+    dst_file = f"{res_fold}{conf.name}_battery_results.csv"
+    out = open(dst_file, mode="w")
+    out.write(res_txt)
+    out.close()
+
+def process_battery_file(f, test_name_cca):
+    res = []
+    res.append(f"{test_name_cca}_timestamp,{test_name_cca}_battery_pct,{test_name_cca}_battery_charging,")
+    lines = f.readlines()
+    for l in lines:
+        res.append(l.strip())
     return res
 
 def create_res_folder(name:str, i:int):

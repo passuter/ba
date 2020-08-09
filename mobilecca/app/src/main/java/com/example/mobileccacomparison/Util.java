@@ -130,7 +130,11 @@ public class Util {
      * @return array of available ccas
      */
     public static String[] get_cca() {
-        return run_cmd("cat /proc/sys/net/ipv4/tcp_available_congestion_control").split(" ");
+        String[] ccas = run_cmd("cat /proc/sys/net/ipv4/tcp_available_congestion_control").split(" ");
+        for (int i = 0; i < ccas.length; i++) {
+            ccas[i] = ccas[i].trim();//remove whitespaces and newline characters
+        }
+        return  ccas;
     }
 
     /**

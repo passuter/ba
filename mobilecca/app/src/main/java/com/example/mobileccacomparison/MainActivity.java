@@ -24,7 +24,7 @@ public class MainActivity extends AppCompatActivity {
     public void onCheckRoot(View view) {
         if (Util.check_root()) {
             init();
-            if (Config.init(this)) {
+            if (Settings.init(this)) {
                 Intent intent = new Intent(this, HomeActivity.class);
                 startActivity(intent);
             } else {

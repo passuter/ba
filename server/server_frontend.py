@@ -425,7 +425,7 @@ class Mod_dev_config_frame(Frame):
         #Frame to hold entry boxes to enter the config of the device
         #expose entries with self to functions in class
         lhs = Frame(self)
-        length_lbl = Label(lhs, text="Enter length of test (default in seconds)")
+        length_lbl = Label(lhs, text=f"Enter length of test\n(default in seconds)")
         length_lbl.grid(row=0, column=0)
         self.length_entry = Entry(lhs)
         self.length_entry.grid(row=0, column=1)
@@ -592,7 +592,6 @@ class Run_config_frame(Frame):
         Frame.__init__(self, parent, width=window_width, height=window_height)
         self.pack(fill=BOTH)
         #Get information about starttime and runtime
-        current_time = datetime.now().strftime("%H:%M:%S")
         max_time = 0
         for dev_conf in active_config.dev_configs:
             max_time = max(max_time, dev_conf.length * dev_conf.number_of_cca)
@@ -601,7 +600,7 @@ class Run_config_frame(Frame):
             max_time = round(max_time/60, 1)
         else:
             time_unit = "seconds"
-        run_info = f"Test name: {active_config.name}\nStarttime: {current_time}, minimal runtime: {max_time} {time_unit}"
+        run_info = f"Test name: {active_config.name}\nStarttime: {state.starttime}, minimal runtime: {max_time} {time_unit}"
         lbl_top = Label(self, text=run_info)
         lbl_top.pack(side=TOP)
 
@@ -633,7 +632,7 @@ class Run_config_frame(Frame):
     def run_conf(self):
         iperf_server.start_emulating()
         config_queue.put(active_config.copy())
-        state.started=True
+        state.start()
         close_and_call(self, view_run_progress)
 
     def close_action(self):

@@ -27,7 +27,7 @@ public class TestActivity extends AppCompatActivity {
      * @param view
      */
     public void onTest(View view) {
-        String res = Util.appDir + Config.current.name + "_battery1";
+        String res = Util.appDir + Settings.current.name + "_battery1";
         set_txt(res);
     }
 

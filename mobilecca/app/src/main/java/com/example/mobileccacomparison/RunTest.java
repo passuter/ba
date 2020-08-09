@@ -9,6 +9,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
+import java.util.Set;
 
 public class RunTest extends Thread {
 
@@ -80,7 +81,7 @@ public class RunTest extends Thread {
         }
 
         String iperf_res_file_tmp = "iperf_res.txt";
-        String iperf_res_file = "/sdcard/" + Config.current.name + "_iperf_res.txt";
+        String iperf_res_file = "/sdcard/" + Settings.current.name + "_iperf_res.txt";
         results_files[0] = iperf_res_file;
         try {
             FileOutputStream fOut = Util.cont.openFileOutput(iperf_res_file_tmp, Context.MODE_PRIVATE);
@@ -89,7 +90,7 @@ public class RunTest extends Thread {
             osw.close();
             fOut = Util.cont.openFileOutput("res_id.txt", Context.MODE_PRIVATE);
             osw = new OutputStreamWriter(fOut);
-            String txt = Config.current.name + "," + name + "\n" + Util.stringArray_toString(results_files, ",");
+            String txt = Settings.current.name + "," + name + "\n" + Util.stringArray_toString(results_files, ",");
             osw.write(txt);
             osw.close();
         } catch (FileNotFoundException e) {
@@ -122,7 +123,7 @@ public class RunTest extends Thread {
         String tcp_cmd;
 
         public RunTCPdump(String length, int runNumber) {
-            result_file = "/sdcard/" + Config.current.name + "_dump_run" + runNumber + ".pcap";
+            result_file = "/sdcard/" + Settings.current.name + "_dump_run" + runNumber + ".pcap";
             //length of tcpdump specified according to https://stackoverflow.com/questions/25731643/how-to-schedule-tcpdump-to-run-for-a-specific-period-of-time
             tcp_cmd = "./tcpdump -i any -s 0 -G " + length + " -W 1 -w " + result_file;
         }
@@ -138,7 +139,7 @@ public class RunTest extends Thread {
     public  class BatteryMeasurements extends MeasuringThread {
         int length;
         Intent batteryStatus;
-        int measuring_intervall = 60; //wait time between measurements in seconds
+        int measuring_interval;
 
         /**
          * Constructs class that performs measurements of the battery
@@ -147,9 +148,10 @@ public class RunTest extends Thread {
          */
         public BatteryMeasurements(String length, int run_number) {
             this.length = Integer.parseInt(length);
-            this.result_file = Config.current.name + "_battery_run" + run_number + ".txt";
+            this.result_file = Settings.current.name + "_battery_run" + run_number + ".txt";
             IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
             batteryStatus = Util.cont.registerReceiver(null, ifilter);
+            measuring_interval = Settings.current.battery_measurement_interval;
         }
 
         @Override
@@ -163,8 +165,8 @@ public class RunTest extends Thread {
                     if (time_passed >= length) {
                         break; //used break statement instead of while condition to avoid last sleep()
                     }
-                    time_passed += measuring_intervall;
-                    sleep(measuring_intervall * 1000);
+                    time_passed += measuring_interval;
+                    sleep(measuring_interval * 1000);
                 }
                 osw.close();
             } catch (FileNotFoundException e) {
