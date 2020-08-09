@@ -2,23 +2,17 @@ package com.example.mobileccacomparison;
 
 import androidx.appcompat.app.AppCompatActivity;
 
-import android.content.res.AssetManager;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.View;
 import android.widget.TextView;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.TimeoutException;
 
 
 public class TestActivity extends AppCompatActivity {
+    /**
+     * Activity for testing and debugging
+     */
 
     public static ConcurrentLinkedQueue<String> q;
 
@@ -28,13 +22,21 @@ public class TestActivity extends AppCompatActivity {
         setContentView(R.layout.activity_test);
     }
 
+    /**
+     * print something using set_txt()
+     * @param view
+     */
     public void onTest(View view) {
-        String res = runIperf("192.168.1.127", "5201");
+        String res = Util.appDir + Config.current.name + "_battery1";
         set_txt(res);
     }
 
+    /**
+     * Manually start a test (with hardcoded values)
+     * @param view
+     */
     public void onTest2(View view) {
-        RunTest t = new RunTest("Base", "3", "192.168.1.127", "5201", 2, new String[]{"reno", "cubic"});
+        RunTest t = new RunTest("Base", "3", true, "192.168.1.127", "5201", 2, new String[]{"reno", "cubic"});
         set_txt("Starting test run");
         t.start();
         int time = 0;

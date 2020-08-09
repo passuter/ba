@@ -130,9 +130,7 @@ public class Connection extends Thread{
         int type = Integer.parseInt(msg_split[1]);
         //copy msg data into new array
         String[] data = new String[msg_split.length-2];
-        for (int i = 2; i < msg_split.length; i++) {
-            data[i-2] = msg_split[i];
-        }
+        System.arraycopy(msg_split, 2, data, 0, msg_split.length - 2);
         String response = "";
         switch (type) {
             case 2: break;
@@ -149,17 +147,16 @@ public class Connection extends Thread{
         try {
             String name = data[0];
             String length = data[1];
-            String ip = data[2];
-            String port = data[3];
-            int number_cca = Integer.parseInt(data[4]);
+            boolean is_battery_test = data[2] == "True";
+            String ip = data[3];
+            String port = data[4];
+            int number_cca = Integer.parseInt(data[5]);
             String[] ccas = new String[number_cca];
-            for (int i = 0; i < number_cca; i++) {
-                ccas[i] = data[i + 5];
-            }
+            System.arraycopy(data, 6, ccas, 0, number_cca);
             if (test != null) {
                 throw new RuntimeException("Test is already running");
             }
-            test = new RunTest(name, length, ip, port, number_cca, ccas);
+            test = new RunTest(name, length, is_battery_test, ip, port, number_cca, ccas);
             test.start();
             test.join();
             String num_files = String.valueOf(test.results_files.length);

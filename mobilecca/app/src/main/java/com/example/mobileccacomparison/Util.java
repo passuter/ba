@@ -21,7 +21,7 @@ public class Util {
 
     public static final int MAX_PORT = 65535;
     public static String appDir; //files directory of the app
-    public static Context cont;
+    public static Context cont; //makes the context of the app globally accessible
 
 
     public static void init(Context context) {
@@ -104,6 +104,14 @@ public class Util {
             }
             return run_cmd(sb.toString(), printError);
         }
+    }
+
+    /**
+     * run multiple commands on a su shell
+     * @return "" if nothing executed, otherwise response from the shell
+     */
+    public static String run_cmds(String[] commands) {
+        return run_cmds(commands, false);
     }
 
     /**

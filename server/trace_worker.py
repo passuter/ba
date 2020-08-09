@@ -63,7 +63,10 @@ def intervall_loader(src:str):
     rate2 = []
 
     for i in range(len(intervalls)):
-        num_of_reps = int(int(intervalls[i])/emulating_intervall)
+        if emulating_intervall > 0:
+            num_of_reps = int(int(intervalls[i])/emulating_intervall)
+        else:
+            num_of_reps = int(intervalls[i])
         for j in range(num_of_reps):
             delay2.append(delay[i])
             loss2.append(loss[i])
@@ -82,7 +85,7 @@ def debug():
     server_frontend.trace_worker.init()
     server_frontend.signal_queue = None
     server_frontend.init_tk()
-    dev_conf = Dev_config("Mock_device", 10, None, None, "(1.1.1.1, 1024)", 1, ["CCA1"])
+    dev_conf = Dev_config("Mock_device", 10, False, None, None, "(1.1.1.1, 1024)", 1, ["CCA1"])
     device = Device(None, "(1.1.1.1, 1024)")
     server_frontend.Select_trace_frame(dev_conf, device, debug=True, ret_cmd=debug2)
     server_frontend.mainloop()

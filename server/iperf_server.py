@@ -15,7 +15,7 @@ traces:dict = dict() #mapping of traces files to Trace objects
 netem_thread = None
 iperf_processes = []
 running = False
-emulating_intervall = 10 #intervall in ms for trace emulation
+emulating_intervall = 10 #sleep intervall in ms for trace emulation, set to 0 to never sleep
 
 def setup():
     """
@@ -81,7 +81,8 @@ def netem_emulator(flow_mappings):
                 print(cmd)
                 print(out)
         i += 1
-        sleep(emulating_intervall/1000) #wait for specified intervall before changing again
+        if emulating_intervall > 0:
+            sleep(emulating_intervall/1000) #wait for specified intervall before changing again
 
 
 def execute(cmd, with_error=False):
