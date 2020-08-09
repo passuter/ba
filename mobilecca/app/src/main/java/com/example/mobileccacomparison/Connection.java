@@ -141,7 +141,7 @@ public class Connection extends Thread{
         try {
             String name = data[0];
             String length = data[1];
-            boolean is_battery_test = data[2] == "True";
+            boolean is_battery_test = data[2].equals("True");
             String ip = data[3];
             String port = data[4];
             int number_cca = Integer.parseInt(data[5]);
@@ -152,11 +152,13 @@ public class Connection extends Thread{
             }
             test = new RunTest(name, length, is_battery_test, ip, port, number_cca, ccas);
             test.start();
+            queue.offer("Running test " + name);
             test.join();
             String num_files = String.valueOf(test.results_files.length);
             String file_res = Util.stringArray_toString(test.results_files, ",");
             test = null; //test completed, can be removed
             response = ",21," + num_files + "," + file_res; //write back success
+            queue.offer("Finished test " + name);
         } catch (RuntimeException | InterruptedException e) {
             response = ",21,0," + e.toString();
         }

@@ -103,7 +103,6 @@ public class RunTest extends Thread {
 
         String[] copy_cmds = new String[]{"cd " + Util.appDir, "cp " + iperf_res_file_tmp + " " + iperf_res_file, "cp res_id.txt /sdcard/res_id.txt"};
         Util.run_cmds(copy_cmds);
-
     }
 
     public abstract class MeasuringThread extends Thread {
