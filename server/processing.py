@@ -109,10 +109,10 @@ def process_iperf_res(config:Config, state:State):
                 if cur:
                     mat.append(cur)
                     cur = []
-                cur.append(f"timestamp,{dev_conf.name}  with cca {tokens[2]}")
+                cur.append(f"timestamp,{dev_conf.name} with cca {tokens[2]}")
             elif tokens[1] == "ID]": reading = not reading
             elif tokens[1] == "5]" and reading:
-                timestamp = tokesn[2]
+                timestamp = tokens[2]
                 num = float(tokens[6])
                 unit = tokens[7]
                 num = int(num * factor[unit[0]])
@@ -121,7 +121,8 @@ def process_iperf_res(config:Config, state:State):
                 #line with connection info, extract port numbers
                 port = int(tokens[5])
                 dev_conf.src_ports.append(port)
-        if cur: mat.append(cur)
+        if cur:
+            mat.append(cur)
         f.close()
         if delete_files_after_processing:
             os.remove(file_name)
@@ -132,9 +133,10 @@ def process_iperf_res(config:Config, state:State):
         res_txt += f"{mat[j][0]},"
     for i in range(max_len):
         #res_txt += f"\n{i}s"
+        res_txt += f"\n"
         for j in range(len(mat)):
             try: res_txt += f"{mat[j][i+1]},"
-            except IndexError: res_text += f"0,0"
+            except IndexError: pass#res_text += f"0,0"
 
     res_file_name = f"{res_fold}iperf_res.csv"
     f = open(res_file_name, mode='w')
