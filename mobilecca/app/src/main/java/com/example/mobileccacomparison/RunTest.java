@@ -28,6 +28,9 @@ public class RunTest extends Thread {
         this.number_cca = number_cca;
         this.ccas = ccas;
         iperf_cmd = "./data/data/com.nextdoordeveloper.miperf.miperf/files/iperf3 -c " + ip + " -p " + port + " -t " + length;
+        if (is_battery_test) {
+            iperf_cmd = iperf_cmd + " -i " + Settings.current.battery_measurement_interval;
+        }
         this.length = length;
         this.is_battery_test = is_battery_test;
         tmp_results_files = new String[number_cca];
@@ -137,7 +140,6 @@ public class RunTest extends Thread {
 
     public  class BatteryMeasurements extends MeasuringThread {
         int length;
-        Intent batteryStatus;
         int measuring_interval;
 
         /**
@@ -148,8 +150,6 @@ public class RunTest extends Thread {
         public BatteryMeasurements(String length, int run_number) {
             this.length = Integer.parseInt(length);
             this.result_file = Settings.current.name + "_battery_run" + run_number + ".txt";
-            IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
-            batteryStatus = Util.cont.registerReceiver(null, ifilter);
             measuring_interval = Settings.current.battery_measurement_interval;
         }
 
@@ -183,6 +183,8 @@ public class RunTest extends Thread {
          * @return battery measurement
          */
         public String get_measurement(int time_passed) {
+            IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+            Intent batteryStatus = Util.cont.registerReceiver(null, ifilter);
             int status = batteryStatus.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
             boolean isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL;
             String charging_state;
