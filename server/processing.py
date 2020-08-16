@@ -38,10 +38,9 @@ def empty_tcp_line(timestamp, separator):
 
 def begin_processing(): 
     """
-    Starts the processing of the data in a new thread
+    Starts the processing of the data
     """
-    conf = server_frontend.active_config
-    state = server_frontend.state
+    state, conf = server_frontend.run_state_configs[server_frontend.run_number]
     process(conf, state)
     #threading.Thread(target=process, args=(conf, state)).start() #process on a different thread to not busy the server, but crashes
 
@@ -82,6 +81,11 @@ def process(conf, state):
         except:
             pass
     print(f"Finished processing data for test {conf.name}")
+    if server_frontend.run_number < len(server_frontend.run_state_configs)-1:
+        #not last test, start next test run
+        server_frontend.run_number += 1
+
+
 
 def process_iperf_res(config:Config, state:State):
     """

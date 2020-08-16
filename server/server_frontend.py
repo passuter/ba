@@ -16,16 +16,17 @@ signal_queue:queue.Queue
 #global variables
 root:Tk
 active_config:Config = None
+run_state_configs:list = list()
+run_number = 0
 server_settings:Server_settings = Server_settings()
 devices = []
 index=-1 #index to store which device is currently selected. get the selected device with devices[index]
-state:State = None
 
 #global parameters
 window_width = 600
 window_height = 600
 default_btn_width = 20
-print_error = print #global function for reporting errors
+print_error = print #global function for reporting errors, used to implement better error reporting
 
 class Separator(Frame):
     def __init__(self, parent, height=10):
@@ -229,7 +230,7 @@ def close_and_call(to_close, foo):
 def shutdown():
     if signal_queue: signal_queue.put(1)
     save_settings()
-    iperf_server.clear_setup()
+    clear_run_setup()
     quit()
 
 def call2(f1, f2):
@@ -274,7 +275,7 @@ def load_settings():
 ################################################################# below: deals with configurations######################################################################################################
 class Config_frame(Frame):
     """
-    Interface for choosing to select, run, add or modify a test configuration
+    Interface for choosing to select, run, add or modify a test configuration on the home window
     """
     def __init__(self, parent):
         Frame.__init__(self, parent, width=window_width, height=300)
@@ -291,10 +292,12 @@ class Config_frame(Frame):
         btn_sel_config = Button(mid_frame, text="Select existing", width=15)
         btn_sel_config['command']= lambda: close_and_call(parent, activate_conf)
 
-        sep = Separator(self)
+        sep1 = Separator(self)
+        sep2 = Separator(self)
         btn_run = Button(self, text="RUN this configuration", fg="green", width=default_btn_width)
         btn_run['command']= lambda: close_and_call(parent, start_run)
-
+        btn_run_multi = Button(self, text="RUN multiple configurations", fg="green")
+        btn_run_multi['command']= lambda: close_and_call(parent, Select_run_multiple_frame)
 
         lbl1.pack(side=TOP, fill=X)
         lbl2.pack(side=TOP, fill=X)
@@ -302,7 +305,9 @@ class Config_frame(Frame):
         btn_new_config.pack(side=LEFT)
         btn_edit_config.pack(side=LEFT)
         btn_sel_config.pack(side=LEFT)
-        sep.pack()
+        sep1.pack()
+        btn_run_multi.pack(side=BOTTOM)
+        sep2.pack(side=BOTTOM)
         btn_run.pack(side=BOTTOM)
 
 
@@ -587,13 +592,71 @@ class Select_trace_frame(Frame):
         self.dev_conf.trace_name = trace_name
         close_and_call(self, lambda: Select_trace_frame(self.dev_conf, self.device, debug=self.debug, ret_cmd=self.ret_cmd))
 
+class Select_run_multiple_frame(Frame):
+    """
+    Allows to start multiple tests which are run consecutively.
+    """
+    def __init__(self):
+        Frame.__init__(self, root, width=window_width, height=window_height)
+        self.pack(fill=BOTH)
+        info_txt = f"Number of selected configs: {len(run_state_configs)}"
+        info_lbl = Label(self, text=info_txt)
+        info_lbl.grid(row=0)
+        separator1 = Separator(self)
+        separator1.grid(row=1)
+        select_btn_txt = "Select config"
+        add_lbl_txt = f"To add another config, enter number of runs\nand press \"{select_btn_txt}\""
+        add_lbl = Label(self, text=add_lbl_txt)
+        add_lbl.grid(row=2)
+        self.entry = Entry(self)
+        self.entry.grid(row=3, column=0)
+        self.entry.insert(END, 0)
+        select_btn = Button(self, text=select_btn_txt, command=self.add, width=default_btn_width)
+        select_btn.grid(row=3, column=1)
+        separator2 = Separator(self, height=40)
+        separator2.grid(row=4)
+        back_btn = Back_btn(self, self.back)
+        back_btn.grid(row=5, column=0)
+        run_btn = Button(self, text="RUN", fg="green", command=self.run, width=default_btn_width)
+        run_btn.grid(row=5, column=1)
+
+    def add(self):
+        conf = load_conf()
+        try:
+            num_of_runs = int(self.entry.get())
+        except ValueError:
+            print_error("Invalid number of repetitions")
+        if conf:
+            for i in range(num_of_runs):
+                state = State(conf) #create new state object for each number of run
+                run_state_configs.append((state, conf))
+            close_and_call(self, Select_run_multiple_frame)
+        else:
+            print_error("No configuration loaded")
+
+    def back(self):
+        clear_run_setup()
+        close_and_call(self, home)
+
+    def run(self):
+        if len(run_state_configs) <= 0:
+            print_error("Cannot run, no configurations selected")
+        else:
+            close_and_call(self, view_run_progress)
+    
+
 class Run_config_frame(Frame):
     def __init__(self, parent):
+        """
+        Displays information about the current test run.
+        """
         Frame.__init__(self, parent, width=window_width, height=window_height)
         self.pack(fill=BOTH)
+        self.state, config = run_state_configs[run_number]
+        state = self.state
         #Get information about starttime and runtime
         max_time = 0
-        for dev_conf in active_config.dev_configs:
+        for dev_conf in config.dev_configs:
             max_time = max(max_time, dev_conf.length * dev_conf.number_of_cca)
         if max_time > 60:
             time_unit = "minutes"
@@ -604,7 +667,7 @@ class Run_config_frame(Frame):
             starttime = state.starttime
         else:
             starttime = "Not started"
-        run_info = f"Test name: {active_config.name}\nStarttime: {starttime}, minimal runtime: {max_time} {time_unit}"
+        run_info = f"Running test {run_number} out of {len(run_state_configs)}\nTest name: {config.name}\nStarttime: {starttime}, minimal runtime: {max_time} {time_unit}"
         lbl_top = Label(self, text=run_info)
         lbl_top.pack(side=TOP)
 
@@ -634,20 +697,18 @@ class Run_config_frame(Frame):
         close_and_call(self, view_run_progress)
     
     def run_conf(self):
-        iperf_server.start_emulating()
-        config_queue.put(active_config.copy())
-        state.start()
-        close_and_call(self, view_run_progress)
+        run_conf()
+        self.update()
 
     def close_action(self):
-        if (not state.started) or state.finished:
-            iperf_server.clear_setup()
+        if (not self.state.started) or self.state.finished:
+            clear_run_setup()
             close_and_call(self, home)
         else:
             close_and_call(self, Ask_abort_frame)
     
     def retry(self):
-        server.collect_data(state)
+        server.collect_data(self.state)
         self.update()
 
 class Ask_abort_frame(Frame):
@@ -667,7 +728,7 @@ class Ask_abort_frame(Frame):
         close_and_call(self, view_run_progress)
     
     def yes(self):
-        iperf_server.clear_setup()
+        clear_run_setup()
         signal_queue.put(3)
         close_and_call(self, home)
 
@@ -718,23 +779,41 @@ def start_run():
     Called when user clicks on 'Run this configuration' on the home window.
     Checks if the configuration is valid and then starts the test run and goes to view_run_progress
     """
-    if is_valid_config():
-        if iperf_server.setup():
-            global state
-            state = State(active_config)
-            view_run_progress()
-        else:
-            print("Could not setup the iperf server")
-            iperf_server.clear_setup()
-            home()
+    if active_config == None:
+        print_error("No configuration selected")
+        home()
     else:
-        home() #cannot run invalid configuration
+        state = State(active_config)
+        run_state_configs.append((state, active_config))
+        view_run_progress()
+
+def run_conf():
+    """
+    Runs the configuration at index run_number in the list run_state_configs
+    """
+    state, config = run_state_configs[run_number]
+    if is_valid_config(config):
+        if iperf_server.setup():
+            iperf_server.start_emulating()
+            config_queue.put(config.copy())
+            state.start()
+        else:
+            print_error("Could not setup the iperf server")
+    else:
+        pass #cannot run invalid configuration
 
 def view_run_progress():
     """
     Show overview of the current run
     """
     Run_config_frame(root)
+
+def clear_run_setup():
+    iperf_server.clear_setup()
+    run_state_configs.clear()
+    global run_number
+    run_number = 0
+    
 
 def save_conf():
     """
@@ -770,7 +849,7 @@ def activate_conf():
 
 def load_conf():
     """
-    Asks for a configuration to open and puts it into active_config.
+    Asks for a configuration to open, tries to load and return it.
     """
     f_loc = filedialog.askopenfilename(title = "Select configuration file", filetypes = (("text files","*.txt"),("all files","*.*")))
     if f_loc == '' or f_loc == (): return None #no file was selected
@@ -786,7 +865,10 @@ def load_conf():
             try: return version_handlers[version](f, name, f_loc) #calls the handler belonging to the version number
             except KeyError: 
                 print("Invalid configuration version")
-        except IndexError: print("Could not load configuration, reading of name and version failed")
+                return None
+        except IndexError:
+            print("Could not load configuration, reading of name and version failed")
+            return None
 
 #load_v* load a specific version
 
@@ -846,31 +928,28 @@ def to_none(string:str):
         return string
 
 
-def is_valid_config():
+def is_valid_config(config:Config):
     """
     Checks wheter the current configuration is a valid configuration.
     """
-    if active_config == None:
-        print_error(["No configuration selected"])
-        return False
     correct_values = True #Set to false if any value does not meet criterea
-    error_txt = [f"Invalid configuration \"{active_config.name}\""]
-    if active_config.name == "":
+    error_txt = [f"Invalid configuration \"{config.name}\""]
+    if config.name == "":
         correct_values = False
         error_txt.append(f"Invalid configuration name")
-    num_dev = len(active_config.dev_configs)
-    if num_dev != active_config.num_of_dev:
+    num_dev = len(config.dev_configs)
+    if num_dev != config.num_of_dev:
         correct_values = False
         error_txt.append("Length of dev_configs list and num_of_dev don't correspond (Internal error)")
     if num_dev <= 0:
         correct_values = False
         error_txt.append("No device in this test")
-    for d in active_config.dev_configs:
+    for d in config.dev_configs:
         correct_values = is_valid_dev_config(d) and correct_values
     
     #check if device is connected and has all specified CCAs
     update_dev()
-    for dev_conf in active_config.dev_configs:
+    for dev_conf in config.dev_configs:
         name = dev_conf.name
         device = get_dev_by_name(devices, name)
         if get_dev_by_name(devices, name) == None:
