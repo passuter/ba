@@ -9,15 +9,16 @@ This file handles the conversion of traces to the required format.
 To add a new handler, create a function in this file and add it to the handler_mapping in function init
 """
 handler_mapping:dict = dict()
-emulating_intervall:int
+emulating_interval:int
 
 def init():
-    global handler_mapping, emulating_intervall
+    global handler_mapping, emulating_interval
     handler_mapping = {
         'txt': txt_loader,
-        'intervall': intervall_loader,
+        'interval': interval_loader,
+        'norw': norw_loader,
     }
-    emulating_intervall = iperf_server.emulating_intervall
+    emulating_interval = iperf_server.emulating_interval
 
 def load_trace(source:str, trace_handler:str,):
     """
@@ -48,13 +49,13 @@ def txt_loader(src:str):
     rate = f.readline().strip().split(',')
     return Trace(delay, loss, rate)
 
-def intervall_loader(src:str):
+def interval_loader(src:str):
     """
-    Loads an intervall file. First line is length of each intervall in ms, following lines are values for each intervall.
-    Each intervall should be a multiple of emulating_intervall
+    Loads an interval file. First line is length of each interval in ms, following lines are values for each interval.
+    Each interval should be a multiple of emulating_interval
     """
     f = open(src)
-    intervalls = f.readline().strip().split(',')
+    intervals = f.readline().strip().split(',')
     delay = f.readline().strip().split(',')
     loss = f.readline().strip().split(',')
     rate = f.readline().strip().split(',')
@@ -62,17 +63,38 @@ def intervall_loader(src:str):
     loss2 = []
     rate2 = []
 
-    for i in range(len(intervalls)):
-        if emulating_intervall > 0:
-            num_of_reps = int(int(intervalls[i])/emulating_intervall)
+    for i in range(len(intervals)):
+        if emulating_interval > 0:
+            num_of_reps = int(int(intervals[i])/emulating_interval)
         else:
-            num_of_reps = int(intervalls[i])
+            num_of_reps = int(intervals[i])
         for j in range(num_of_reps):
             delay2.append(delay[i])
             loss2.append(loss[i])
             rate2.append(rate[i])
     
     return Trace(delay2, loss2, rate2)
+
+def norw_loader(src:str):
+    if emulating_interval > 0:
+        em_interval = emulating_interval
+    else:
+        em_interval = 1
+    f = open(src)
+    delay = [f.readline().strip()]
+    loss = [f.readline().strip()]
+    rate = []
+    tokens = f.readline().strip().split(',')
+    for t in tokens:
+        try:
+            interval = int(t.split()[0])
+            bandwidth = t.split()[1]
+            for i in range(int(interval/em_interval)):
+                rate.append(bandwidth)
+        except IndexError:
+            pass #last token may be empty
+    
+    return Trace(delay, loss, rate)
 
 
 

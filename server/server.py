@@ -57,7 +57,7 @@ def server_loop():
                 device = Device(client, addr)
                 devices.append(device)
             else:
-                #potentially reads multiple messages, in practice only one message arrives in read intervall
+                #potentially reads multiple messages, in practice only one message arrives in read interval
                 data = s.recv(4096)
                 device = find_device_by_socket(s)
                 handle_msg(data, device)

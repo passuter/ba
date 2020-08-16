@@ -12,7 +12,7 @@ raw_res_fold:str
 res_fold:str = ""
 delete_files_after_processing:bool
 
-measuring_intervall = 0.25 #in seconds
+measuring_interval = 0.25 #in seconds
 
 def init():
     """
@@ -190,8 +190,8 @@ def process_pcap(src_file:str, test_name:str, phone_port:int, server_port:int):
     stream_id = None
     i = 0
     res = f"{test_name}_Timestamp,{test_name}_throughput,{test_name}_avg_RTT,{test_name}_loss\n"
-    #following variables store the old values during every intervall
-    timestamp = -measuring_intervall
+    #following variables store the old values during every interval
+    timestamp = -measuring_interval
     ack_num = 0
     rtts = []
     pkt_num = 0
@@ -234,14 +234,14 @@ def process_pcap(src_file:str, test_name:str, phone_port:int, server_port:int):
             rtt = float(tcp.analysis_ack_rtt)
             rtts.append(rtt)
             time_passed = float(tcp.time_relative) - timestamp
-            if time_passed >= measuring_intervall:
-                timestamp += measuring_intervall
-                mod_time_passed = time_passed - measuring_intervall
-                while mod_time_passed >= measuring_intervall:
-                    #entering this loop means more than one intervall passed, the previous ones are zeroed
+            if time_passed >= measuring_interval:
+                timestamp += measuring_interval
+                mod_time_passed = time_passed - measuring_interval
+                while mod_time_passed >= measuring_interval:
+                    #entering this loop means more than one interval passed, the previous ones are zeroed
                     res += empty_tcp_line(timestamp, f",\n")
-                    timestamp += measuring_intervall
-                    mod_time_passed -= measuring_intervall
+                    timestamp += measuring_interval
+                    mod_time_passed -= measuring_interval
                 bytes_acked = int(tcp.ack) - ack_num
                 throughput = bytes_acked / time_passed
                 throughput_KBps = round(throughput/1000, 2)
@@ -375,7 +375,7 @@ def combine_files(file_names, output_name):
                 l = lines[i].strip()
                 res += l
             except IndexError:
-                timestamp = (i-1) * measuring_intervall
+                timestamp = (i-1) * measuring_interval
                 res += empty_tcp_line(timestamp, ",")
         res += f"\n"
     

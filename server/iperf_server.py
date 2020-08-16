@@ -15,7 +15,7 @@ traces:dict = dict() #mapping of traces files to Trace objects
 netem_thread = None
 iperf_processes = []
 running = False
-emulating_intervall = 10 #sleep intervall in ms for trace emulation, set to 0 to never sleep
+emulating_interval = 100 #sleep interval in ms for trace emulation, set to 0 to never sleep
 
 def setup():
     """
@@ -32,8 +32,8 @@ def setup():
         print(f"Shell error, FileNotFound")
         return False
 
-    if emulating_intervall <= 0:
-        raise ValueError(f"Invalid emulating_intervall in iperf_server.py. Must be >0")
+    if emulating_interval <= 0:
+        raise ValueError(f"Invalid emulating_interval in iperf_server.py. Must be >0")
 
     generate_traces()
     start_iperf_processes()
@@ -81,8 +81,8 @@ def netem_emulator(flow_mappings):
                 print(cmd)
                 print(out)
         i += 1
-        if emulating_intervall > 0:
-            sleep(emulating_intervall/1000) #wait for specified intervall before changing again
+        if emulating_interval > 0:
+            sleep(emulating_interval/1000) #wait for specified interval before changing again
 
 
 def execute(cmd, with_error=False):
