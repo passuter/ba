@@ -88,7 +88,7 @@ class State:
     dev_status:dict = dict() 
     status:dict = {
         -1: "error",
-        0: "running",
+        0: "running test",
         1: "finished run, now pulling data",
         2: "data pulled, now processing",
         3: "data processed"
@@ -112,6 +112,9 @@ class State:
     def start(self):
         self.started = True
         self.starttime = datetime.now().strftime("%H:%M:%S")
+        #reset device status to 0, needed when running multiple tests
+        for d in self.dev_status:
+            self.dev_status[d] = 0
 
     def set_state(self, dev_name:str, i:int):
         """

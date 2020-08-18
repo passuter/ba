@@ -200,11 +200,13 @@ def update_dev():
     """
     if not device_queue: return#when testing without active server (e.g. for testing), update_dev() fails as no queues exist
     signal_queue.put(2)
-    try: dev:list = device_queue.get(timeout=3) #wait for server to fill queue
-    except queue.Empty: print("Error: Unable to update devices")
-    global devices, index
-    index = -1 #reset device selection. Otherwise it might lead to an Index out of Bound error should some device(s) have disconnected
-    devices = dev
+    try:
+        dev:list = device_queue.get(timeout=3) #wait for server to fill queue
+        global devices, index
+        index = -1 #reset device selection. Otherwise it might lead to an Index out of Bound error should some device(s) have disconnected
+        devices = dev
+    except queue.Empty:
+        pass #print("Error: Unable to update devices")
 
 def hi_foo(str):
     """
@@ -667,7 +669,7 @@ class Run_config_frame(Frame):
             starttime = state.starttime
         else:
             starttime = "Not started"
-        run_info = f"Running test {run_number} out of {len(run_state_configs)}\nTest name: {config.name}\nStarttime: {starttime}, minimal runtime: {max_time} {time_unit}"
+        run_info = f"Running test {run_number+1} out of {len(run_state_configs)}\nTest name: {config.name}\nStarttime: {starttime}, minimal runtime: {max_time} {time_unit}"
         lbl_top = Label(self, text=run_info)
         lbl_top.pack(side=TOP)
 
@@ -793,6 +795,8 @@ def run_conf():
     """
     state, config = run_state_configs[run_number]
     if is_valid_config(config):
+        global active_config
+        active_config = config
         if iperf_server.setup():
             iperf_server.start_emulating()
             config_queue.put(config.copy())

@@ -222,12 +222,13 @@ def handle_msg21(msg_data, device):
         print(f"{device.name} encountered an error during a test run")
         dev_status = -1
 
+    state, _ = server_frontend.run_state_configs[server_frontend.run_number]
     try:
-        server_frontend.state.set_state(device.name, dev_status)
+        state.set_state(device.name, dev_status)
     except KeyError: pass
-    if server_frontend.state.all_finished_stage(0):
+    if state.all_finished_stage(0):
         iperf_server.stop_emulating()
-        collect_data(server_frontend.state)
+        collect_data(state)
 
 def send_msg(msg, device):
     """

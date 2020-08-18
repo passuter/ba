@@ -5,7 +5,7 @@ import threading
 import sys
 from tkinter import filedialog
 
-import server_frontend, server
+import server_frontend, server, iperf_server
 from data_structures import *
 
 raw_res_fold:str
@@ -81,9 +81,13 @@ def process(conf, state):
         except:
             pass
     print(f"Finished processing data for test {conf.name}")
+    iperf_server.clear_setup()
     if server_frontend.run_number < len(server_frontend.run_state_configs)-1:
         #not last test, start next test run
         server_frontend.run_number += 1
+        server_frontend.run_conf()
+    else:
+        print(f"All done\n\n")
 
 
 
@@ -162,6 +166,8 @@ def process_tcp_dump(conf:Config, state:State):
             #number of ports and number of ccas do not match, cannot process this device
             #can happen for example if phone could not connect to iperf server, then the iperf file cannot be read completely
             state.set_state(dev_conf.name, -1)
+            print(f"Error in process_tcp_dump for {dev_conf.name}")
+            print(len(dev_conf.src_ports))
             continue
         for i in range(dev_conf.number_of_cca):
             src_file = raw_res_fold + dev_conf.name + f"_dump_run{i}.pcap"
@@ -177,7 +183,8 @@ def process_tcp_dump(conf:Config, state:State):
                 os.remove(src_file)
             print(f"Processed {test_name_cca}")
         state.set_state(dev_conf.name, 3)
-        print(f"Device {dev_conf.name} data has been processed")
+        dev_conf.src_ports = [] #reset src_ports, necessary if running multiple test with same configuration
+        #print(f"Device {dev_conf.name} data has been processed")
     combined_output = f"{res_fold}{conf.name}_combined.csv"
     combine_files(processed_files, combined_output)
 
