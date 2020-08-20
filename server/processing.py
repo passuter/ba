@@ -196,7 +196,7 @@ def process_pcap(src_file:str, test_name:str, phone_port:int, server_port:int):
 
     stream_id = None
     i = 0
-    res = f"{test_name}_Timestamp,{test_name}_throughput,{test_name}_avg_RTT,{test_name}_loss\n"
+    res = f"{test_name}_Timestamp,{test_name}_throughput,{test_name}_avg_RTT,{test_name}_loss,\n"
     #following variables store the old values during every interval
     timestamp = -measuring_interval
     ack_num = 0
