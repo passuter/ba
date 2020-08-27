@@ -88,7 +88,7 @@ def plot_avg_rtt():
 
 
 def plot_throughput_delay_scatter():
-    params = get_tests(["metro"])
+    params = get_tests()
     columns = ["test_name", "avg_rtt", "avg_throughput", "artificial loss in %", "cca", "trace", "artificial delay"]
     accumulator = []
     for param in params:
@@ -107,7 +107,7 @@ def plot_throughput_delay_scatter():
 
 
 def plot_throughput_delay_line():
-    params = get_tests(traces=["metro"], losses=[0], delays=[100])
+    params = get_tests(traces=["bus"], losses=[0], delays=[5])
     accumulator = []
     columns = ["timestamp", "rtt", "throughput", "cca"]
     for param in params:
@@ -119,16 +119,16 @@ def plot_throughput_delay_line():
             col = data[rtt]
             data[rtt] = col.map(lambda x: round(x, -1))
             for _, row in data.iterrows():
-                if int(row[rtt]) > 0: #rtt == 0 indicates filler row due to lack of data
-                    accumulator.append([row[ts], row[rtt], row[tp], cca])
+                #if int(row[rtt]) > 0: #rtt == 0 indicates filler row due to lack of data
+                accumulator.append([row[ts], row[rtt], row[tp], cca])
 
     df = pd.DataFrame(np.array(accumulator), columns=columns)
     df.rtt = df.rtt.astype(float)
     df.timestamp = df.timestamp.astype(float)
     df.throughput = df.throughput.astype(float)
 
-    #sns.lineplot(x="rtt", y="throughput", data=df, hue="cca")
-    sns.lineplot(x="timestamp", y="rtt", data=df, hue="cca")
+    sns.lineplot(x="rtt", y="throughput", data=df, hue="cca")
+    #sns.lineplot(x="timestamp", y="rtt", data=df, hue="cca")
     plt.show()
 
 
