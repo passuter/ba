@@ -94,6 +94,7 @@ def process(conf, state):
 def process_iperf_res(config:Config, state:State):
     """
     Reads all iperf results from all devices and writes the bandwidth into a single csv file
+    Throughput in bits/second
     """
     max_len = 0
     for dev_conf in config.dev_configs:
@@ -155,6 +156,7 @@ def process_iperf_res(config:Config, state:State):
 def process_tcp_dump(conf:Config, state:State):
     """
     Processes the tcpdump file of each device.
+    Throughput in KBps
     """
     processed_files = []
     for dev_conf in conf.dev_configs:
