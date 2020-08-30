@@ -28,6 +28,7 @@ class Parameter:
 
 class Btry_parameter:
     type:str
+    throughput_limit:int 
     loss:int
     test_name:str
     folder:str
@@ -37,8 +38,10 @@ class Btry_parameter:
         self.loss = loss
         if type == "normal":
             type = ""
+            self.throughput_limit = 1000
         else:
-            type = f"_{type}"    
+            type = f"_{type}"
+            self.throughput_limit = 50
         self.test_name = f"battery_l{loss}{type}"
         self.folder = f"{results_folder}/{self.test_name}_{num}/"
 
@@ -131,7 +134,7 @@ def compute_avg_tp_limit(trace:str):
             pass
     avg_time = np.mean(time)
     avg_tp = np.mean(tps) / avg_time
-    return avg_tp #convert from kilobits per second to kilobytes per second
+    return avg_tp
     
 def plot_trace(trace:str):
     f = open(f"loss_traces/{trace}_d5l0.txt")
@@ -141,7 +144,7 @@ def plot_trace(trace:str):
     timestamp = 0
     for v in values:
         try:
-            time = int(v.split()[0])
+            time = float(v.split()[0]) / 1000
             tp = int(v.split()[1].split('k')[0])
             accumulator.append([timestamp+1, tp])
             timestamp += time
@@ -152,7 +155,10 @@ def plot_trace(trace:str):
     df = pd.DataFrame(np.array(accumulator), columns=columns)
     df.timestamp = df.timestamp.astype(float)
     df.tp = df.tp.astype(float)
-    sns.lineplot(x="timestamp", y="tp", data=df)
+    plot = sns.lineplot(x="timestamp", y="tp", data=df)
+    plot.set_title(f"Bandwidth trace \"{trace}\"")
+    plot.set_xlabel("Time (seconds)")
+    plot.set_ylabel("Throughput limit (KBps)")
     plt.show()
     
 
@@ -161,7 +167,7 @@ def plot_throughput_delay_scatter():
     all_traces.remove("metro")
     all_traces.remove("tram3")
     params = get_tests()
-    columns = ["test_name", "avg_rtt", "avg_throughput", "artificial loss in %", "cca", "trace", "artificial delay", "avg_tp_norm", "avg_rtt_norm"]
+    columns = ["test_name", "avg_rtt", "avg_throughput", "Artificial loss in %", "CCA", "trace", "Artificial delay", "avg_tp_norm", "avg_rtt_norm"]
     accumulator = []
     for param in params:
         data = pd.read_csv(param.file_name)
@@ -179,35 +185,44 @@ def plot_throughput_delay_scatter():
     df.avg_throughput = df.avg_throughput.astype(float)
     df.avg_rtt_norm = df.avg_rtt_norm.astype(float)
     df.avg_tp_norm = df.avg_tp_norm.astype(float)
-    sns.relplot(x="avg_rtt_norm", y="avg_tp_norm", data=df, hue="cca", style="artificial loss in %")
+    plot = sns.relplot(x="avg_rtt_norm", y="avg_tp_norm", data=df, hue="CCA", style="Artificial loss in %")
+    plot.set_xlabels("Average RTT (without artificial delay, in miliseconds)")
+    plot.set_ylabels("Normalized throughput") #average throughput achieved relative to average throughput limit
+    plt.title("Throughput/delay comparison, \"metro\" trace")
     plt.show()
 
 
 def plot_throughput_delay_line():
     #params = get_tests(traces=["bus"], losses=[0], delays=[25])
-    params = get_tests(traces=["ferry"], losses=[0])
+    params = get_tests(traces=["metro"], losses=[0])
     accumulator = []
-    columns = ["timestamp", "rtt", "throughput", "cca", "trace", "artificial delay", "artificial loss", "test_name"]
+    columns = ["timestamp", "rtt", "throughput", "cca", "trace", "artificial delay", "artificial loss", "test_name", "throughput_norm"]
     for param in params:
         data = pd.read_csv(param.file_name)
+        avg_throughput_limitation = compute_avg_tp_limit(param.trace)
         for cca in all_ccas:
             rtt = get_column_name(param.test_name, cca, "rtt")
             ts = get_column_name(param.test_name, cca, "timestamp")
             tp = get_column_name(param.test_name, cca, "throughput")
             col = data[rtt]
-            data[rtt] = col.map(lambda x: 5*round(x/5, -1))
+            data[rtt] = col.map(lambda x: round(x))
             for _, row in data.iterrows():
-                filter = int(row[rtt]) > 0 and int(row[rtt]) < 200000
-                if True: #rtt == 0 indicates filler row due to lack of data
-                    accumulator.append([row[ts], row[rtt], row[tp], cca, param.trace, param.delay, param.loss, f"{param.test_name}_{param.num}"])
+                tp_normalized = float(row[tp])/avg_throughput_limitation
+                filter = int(row[rtt]) > 0 #rtt == 0 indicates filler row due to lack of data
+                if filter: 
+                    accumulator.append([row[ts], row[rtt], row[tp], cca, param.trace, param.delay, param.loss, f"{param.test_name}_{param.num}", tp_normalized])
 
     df = pd.DataFrame(np.array(accumulator), columns=columns)
     df.rtt = df.rtt.astype(float)
     df.timestamp = df.timestamp.astype(float)
     df.throughput = df.throughput.astype(float)
+    df.throughput_norm = df.throughput_norm.astype(float)
 
-    #sns.lineplot(x="rtt", y="throughput", data=df, hue="cca")
-    sns.lineplot(x="timestamp", y="throughput", data=df, hue="cca")
+    #plot = sns.lineplot(x="rtt", y="throughput", data=df, hue="cca")
+    plot = sns.lineplot(x="timestamp", y="rtt", data=df, hue="cca")
+    plot.set_title(f"RTT over time for trace metro, without loss")
+    plot.set_xlabel("Timestamp (seconds)")
+    plot.set_ylabel("RTT (miliseconds)")
     plt.show()
 
 def plot_btry():
@@ -221,17 +236,21 @@ def plot_btry():
         for cca in all_ccas:
             tp_colum = f"Redmi4A with cca {cca}"
             btry_colum = f"{p.test_name}_Redmi4A_{cca}_battery_pct"
-            avg_tp = round(float(tp_mean.loc[tp_colum])/8000, 1) #convert from bits/second to KBps
+            avg_tp = round(float(tp_mean.loc[tp_colum])/8000, 4) #convert from bits/second to KBps
             btry_consumed = data_btry.max().loc[btry_colum] - data_btry.min().loc[btry_colum]
             accumulator.append([avg_tp, btry_consumed, p.type, p.loss, cca])
     df = pd.DataFrame(np.array(accumulator), columns=columns)
     df.avg_throughput = df.avg_throughput.astype(float)
     df.battery_consumption = df.battery_consumption.astype(float)
     print(df)
-    sns.relplot(x="avg_throughput", y="battery_consumption", data=df, hue="cca", style="type")
+    plot = sns.relplot(x="avg_throughput", y="battery_consumption", data=df, hue="cca", style="loss")
+    plot.set_xlabels("Average throughput (KBps)")
+    plot.set_ylabels("Battery consumption (%)")
+    plt.title("Battery/throughput comparison")
     plt.show()
 
-
+def plot_btry_catplot():
+    params = get_battery_tests()
 
 if __name__ == "__main__":
     args = sys.argv
@@ -240,7 +259,8 @@ if __name__ == "__main__":
         param_num = int(args[1])
     except:
         param_num = 0
-    plot_throughput_delay_scatter()
+    #plot_throughput_delay_scatter()
     #plot_throughput_delay_line()
-    #plot_btry()
-    #plot_trace("ferry")
+    plot_btry()
+    #for trace in all_traces:
+    #    plot_trace(trace)
