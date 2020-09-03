@@ -167,7 +167,7 @@ def plot_throughput_delay_scatter():
     all_traces.remove("ferry")
     all_traces.remove("metro")
     all_traces.remove("tram3")
-    params = get_tests(traces=["metro"])
+    params = get_tests(losses=[1])
     columns = ["test_name", "avg_rtt", "avg_throughput", "Artificial loss", "CCA", "trace", "Artificial delay", "avg_tp_norm", "avg_rtt_norm"]
     accumulator = []
     mean_tp_accumulator = [[], [], []]
@@ -187,8 +187,8 @@ def plot_throughput_delay_scatter():
     mean_tp5 = []
     mean_tp25 = []
     mean_tp100 = []
-    for rtt in [100, 2900]:
-    #for rtt in [1, 78]:
+    #for rtt in [100, 2900]:
+    for rtt in [1, 78]:
         mean_tp5.append([np.mean(mean_tp_accumulator[0]), rtt])
         mean_tp25.append([np.mean(mean_tp_accumulator[1]), rtt])
         mean_tp100.append([np.mean(mean_tp_accumulator[2]), rtt])
@@ -203,26 +203,26 @@ def plot_throughput_delay_scatter():
     df.avg_rtt_norm = df.avg_rtt_norm.astype(float)
     df.avg_tp_norm = df.avg_tp_norm.astype(float)
     #sns.lineplot(x="rtt", y="mean_tp", data=mean_df, hue="art_delay")
-    plot = sns.relplot(x="avg_rtt_norm", y="avg_tp_norm", data=df, style="Artificial loss", s=100)
-    plot.set_xlabels("Average RTT (without artificial delay, in miliseconds)", fontsize=12)
+    plot = sns.relplot(x="avg_rtt_norm", y="avg_tp_norm", data=df, style="Artificial delay", s=100)
+    plot.set_xlabels("Average RTT (without artificial delay, in milliseconds)", fontsize=12)
     plot.set_ylabels("Normalized throughput", fontsize=12) #average throughput achieved relative to average throughput limit
     #plt.title("Throughput/delay comparison, \"metro\" trace")
     plot.fig.set_size_inches(4,4)
-    #plot.axes[0,0].plot(mean_df100.rtt, mean_df100.mean_tp, "g-", marker="s")
-    #plot.axes[0,0].plot(mean_df25.rtt, mean_df25.mean_tp, "g--", marker="x")
-    #plot.axes[0,0].plot(mean_df5.rtt, mean_df5.mean_tp, "g:", marker="o")
+    plot.axes[0,0].plot(mean_df100.rtt, mean_df100.mean_tp, "g-", marker="s")
+    plot.axes[0,0].plot(mean_df25.rtt, mean_df25.mean_tp, "g--", marker="x")
+    plot.axes[0,0].plot(mean_df5.rtt, mean_df5.mean_tp, "g:", marker="o")
     #no loss
     #plot.set(xlim=(0,3000))
     #plot.set(ylim=(0.6,1.1))
     #loss
-    #plot.set(xlim=(0,80))
-    #plot.set(ylim=(0,1))
+    plot.set(xlim=(0,80))
+    plot.set(ylim=(0,1))
     #combined
     #plot.set(xlim=(-50, 3000))
     #plot.set(ylim=(0, 1.1))
     #metro
-    plot.set(xlim=(0, 17500))
-    plot.set(ylim=(0.1, 0.65))
+    #plot.set(xlim=(0, 17500))
+    #plot.set(ylim=(0.1, 0.65))
     plt.show()
 
 
@@ -259,7 +259,7 @@ def plot_throughput_delay_line():
     plot = sns.lineplot(x="timestamp", y="rtt", data=df, hue="cca")
     #plot.set_title(f"RTT over time for trace metro, without loss")
     plot.set_xlabel("Timestamp (seconds)", fontsize=12)
-    plot.set_ylabel("RTT (miliseconds)", fontsize=12)
+    plot.set_ylabel("RTT (milliseconds)", fontsize=12)
     
     plt.show()
 
@@ -293,29 +293,29 @@ def plot_btry():
 
 def distplot():
     sns.set_style("whitegrid")
-    #all_traces.remove("ferry")
-    all_traces.remove("metro")
-    all_traces.remove("tram3")
-    params = get_tests()
+    all_traces.remove("ferry")
+    #all_traces.remove("metro")
+    #all_traces.remove("tram3")
+    params = get_tests(losses=[0])
     acc = {"reno": [], "cubic": []}
     columns = ["rtt"]
     for p in params:
         data = pd.read_csv(p.file_name)
         avg_tp_limit = compute_avg_tp_limit(p.trace)
         for cca in all_ccas:
-            #col = get_column_name(p.test_name, cca, "throughput")
-            col = get_column_name(p.test_name, cca, "rtt")
+            col = get_column_name(p.test_name, cca, "throughput")
+            #col = get_column_name(p.test_name, cca, "rtt")
             for _, row in data.iterrows():
-                #val = row[col]/avg_tp_limit
-                val = row[col] - p.delay
+                val = row[col]/avg_tp_limit
+                #val = row[col] - p.delay
                 if val > 0:
                     acc[cca].append([val])
     d1 = pd.DataFrame(np.array(acc["reno"]), columns=columns)
     d2 = pd.DataFrame(np.array(acc["cubic"]), columns=columns)
     sns.distplot(d1.rtt, hist=False, color="b", kde_kws={'cumulative': True, 'linestyle':'-'})
     sns.distplot(d2.rtt, hist=False, color="r", kde_kws={'cumulative': True, 'linestyle':'--'})
-    #plt.xlabel("Normalized Throughput")
-    plt.xlabel("RTT without artificial delay (ms)")
+    plt.xlabel("Normalized Throughput")
+    #plt.xlabel("RTT without artificial delay (ms)")
     plt.ylabel("CDF probability")
     #plt.title("CDF normalized RTT without loss, reno (blue, solid line) and cubic (red, dashed line)")
     plt.show()
@@ -349,6 +349,6 @@ if __name__ == "__main__":
     #plot_btry()
     #for trace in all_traces:
     #    plot_trace(trace)
-    #plot_trace("metro")
+    #plot_trace("ferry")
     distplot()
     #find_outlier()
