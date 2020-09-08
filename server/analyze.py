@@ -1,3 +1,8 @@
+"""
+Author: Pascal Suter
+This module analyzes results from multiple experiments. It is specifically designed for the experiments that were run for the bachelor thesis.
+"""
+
 import seaborn as sns
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -5,6 +10,7 @@ import numpy as np
 import sys
 
 results_folder = "Test_result_experiments"
+#set of all parameters
 all_traces = ["bus", "car1", "car2", "ferry", "metro", "train1", "train2", "tram1", "tram2", "tram3"]
 all_delays = [5, 25, 100]
 all_losses = [0, 1]
@@ -46,6 +52,9 @@ class Btry_parameter:
         self.folder = f"{results_folder}/{self.test_name}_{num}/"
 
 def get_tests(traces=all_traces, delays=all_delays, losses=all_losses):
+    """
+    Generates a list of Parameter objects with the specified parameters
+    """
     res = []
     for trace in traces:
         for delay in delays:
@@ -58,6 +67,9 @@ def get_tests(traces=all_traces, delays=all_delays, losses=all_losses):
     return res
 
 def get_battery_tests(types=["normal", "lowband"], losses=all_losses):
+    """
+    Generates a list of Btry_parameter objects with the specified parameters
+    """
     res = []
     for t in types:
         for l in losses:
@@ -84,37 +96,6 @@ def get_column_name(test_name, cca, type="throughput"):
         raise ValueError(f"Invalid column type: {type}")
     return f"{test_name}_Redmi4A_{cca}_{ending}"
 
-
-def plot_max_rtt():
-    columns = ["test_name", "reno_max_rtt", "cubic_max_rtt", "params", "artificial loss in %"]
-    accumulator = []
-    params = get_tests()
-    for param in params:
-        data = pd.read_csv(param.file_name)
-        maximums = data.max()
-        reno_max_rtt = maximums.loc[f'{param.test_name}_Redmi4A_reno_avg_RTT']
-        cubic_max_rtt = maximums.loc[f'{param.test_name}_Redmi4A_cubic_avg_RTT']
-        accumulator.append([param.test_name, reno_max_rtt, cubic_max_rtt, param, param.loss])
-    df = pd.DataFrame(np.array(accumulator), columns=columns)
-    #print(df)
-    sns.relplot(x="cubic_max_rtt", y="reno_max_rtt", data=df, hue="artificial loss in %", style="artificial loss in %")
-    plt.show()
-
-def plot_avg_rtt():
-    columns = ["test_name", "reno_avg_rtt", "cubic_avg_rtt", "params", "artificial loss in %"]
-    accumulator = []
-    params = get_tests()
-    for param in params:
-        data = pd.read_csv(param.file_name)
-        maximums = data.mean()
-        reno_max_rtt = maximums.loc[f'{param.test_name}_Redmi4A_reno_avg_RTT']
-        cubic_max_rtt = maximums.loc[f'{param.test_name}_Redmi4A_cubic_avg_RTT']
-        accumulator.append([param.test_name, reno_max_rtt, cubic_max_rtt, param, param.loss])
-    df = pd.DataFrame(np.array(accumulator), columns=columns)
-    #print(df)
-    sns.relplot(x="cubic_avg_rtt", y="reno_avg_rtt", data=df, hue="artificial loss in %", style="artificial loss in %")
-    plt.show()  
-
 def compute_avg_tp_limit(trace:str):
     """
     Computes the wheigted average of the bandwith limit for a specific trace
@@ -137,6 +118,9 @@ def compute_avg_tp_limit(trace:str):
     return avg_tp
     
 def plot_trace(trace:str):
+    """
+    Plots the throughput limit over time for a specific trace
+    """
     f = open(f"loss_traces/{trace}_d5l0.txt")
     values = f.readlines()[2].split(',')
     accumulator = []
@@ -163,11 +147,14 @@ def plot_trace(trace:str):
     
 
 def plot_throughput_delay_scatter():
+    """
+    Plots a scatter plot for bandwidth plots, throughput vs delay
+    """
     sns.set_style("whitegrid")
     all_traces.remove("ferry")
     all_traces.remove("metro")
     all_traces.remove("tram3")
-    params = get_tests(losses=[1])
+    params = get_tests(traces=["metro"])
     columns = ["test_name", "avg_rtt", "avg_throughput", "Artificial loss", "CCA", "trace", "Artificial delay", "avg_tp_norm", "avg_rtt_norm"]
     accumulator = []
     mean_tp_accumulator = [[], [], []]
@@ -187,8 +174,8 @@ def plot_throughput_delay_scatter():
     mean_tp5 = []
     mean_tp25 = []
     mean_tp100 = []
-    #for rtt in [100, 2900]:
-    for rtt in [1, 78]:
+    for rtt in [50, 2950]:
+    #for rtt in [1, 78]:
         mean_tp5.append([np.mean(mean_tp_accumulator[0]), rtt])
         mean_tp25.append([np.mean(mean_tp_accumulator[1]), rtt])
         mean_tp100.append([np.mean(mean_tp_accumulator[2]), rtt])
@@ -202,31 +189,33 @@ def plot_throughput_delay_scatter():
     df.avg_throughput = df.avg_throughput.astype(float)
     df.avg_rtt_norm = df.avg_rtt_norm.astype(float)
     df.avg_tp_norm = df.avg_tp_norm.astype(float)
-    #sns.lineplot(x="rtt", y="mean_tp", data=mean_df, hue="art_delay")
-    plot = sns.relplot(x="avg_rtt_norm", y="avg_tp_norm", data=df, style="Artificial delay", s=100)
+    plot = sns.relplot(x="avg_rtt_norm", y="avg_tp_norm", data=df, hue="Artificial loss", style="Artificial loss", s=100)
     plot.set_xlabels("Average RTT (without artificial delay, in milliseconds)", fontsize=12)
     plot.set_ylabels("Normalized throughput", fontsize=12) #average throughput achieved relative to average throughput limit
     #plt.title("Throughput/delay comparison, \"metro\" trace")
     plot.fig.set_size_inches(4,4)
-    plot.axes[0,0].plot(mean_df100.rtt, mean_df100.mean_tp, "g-", marker="s")
-    plot.axes[0,0].plot(mean_df25.rtt, mean_df25.mean_tp, "g--", marker="x")
-    plot.axes[0,0].plot(mean_df5.rtt, mean_df5.mean_tp, "g:", marker="o")
+    #plot.axes[0,0].plot(mean_df100.rtt, mean_df100.mean_tp, "r-", marker="s")
+    #plot.axes[0,0].plot(mean_df25.rtt, mean_df25.mean_tp, "r--", marker="x")
+    #plot.axes[0,0].plot(mean_df5.rtt, mean_df5.mean_tp, "r:", marker="o")
     #no loss
     #plot.set(xlim=(0,3000))
     #plot.set(ylim=(0.6,1.1))
     #loss
-    plot.set(xlim=(0,80))
-    plot.set(ylim=(0,1))
+    #plot.set(xlim=(0,80))
+    #plot.set(ylim=(0,1))
     #combined
     #plot.set(xlim=(-50, 3000))
     #plot.set(ylim=(0, 1.1))
     #metro
-    #plot.set(xlim=(0, 17500))
-    #plot.set(ylim=(0.1, 0.65))
+    plot.set(xlim=(0, 17500))
+    plot.set(ylim=(0.1, 0.65))
     plt.show()
 
 
 def plot_throughput_delay_line():
+    """
+    Plots a lineplot for bandwidth tests
+    """
     #params = get_tests(traces=["bus"], losses=[1])
     params = get_tests(traces=["metro"], losses=[1], delays=[5])
     accumulator = []
@@ -264,6 +253,9 @@ def plot_throughput_delay_line():
     plt.show()
 
 def plot_btry():
+    """
+    Plots a scatter plot for battery tests
+    """
     sns.set_style("whitegrid")
     params = get_battery_tests()
     accumulator = []
@@ -272,7 +264,7 @@ def plot_btry():
         data_btry = pd.read_csv(f"{p.folder}{p.test_name}_battery_results.csv")
         data_tp = pd.read_csv(f"{p.folder}iperf_res.csv")
         tp_mean = data_tp.mean()
-        for cca in ["reno"]:
+        for cca in ["cubic"]:
             tp_colum = f"Redmi4A with cca {cca}"
             btry_colum = f"{p.test_name}_Redmi4A_{cca}_battery_pct"
             avg_tp = round(float(tp_mean.loc[tp_colum])/8000, 4) #convert from bits/second to KBps
@@ -282,7 +274,7 @@ def plot_btry():
     df.avg_throughput = df.avg_throughput.astype(float)
     df.battery_consumption = df.battery_consumption.astype(float)
     print(df)
-    plot = sns.relplot(x="avg_throughput", y="battery_consumption", data=df, style="Artificial loss", s=200)
+    plot = sns.relplot(x="avg_throughput", y="battery_consumption", data=df, hue="Artificial loss", style="Artificial loss", s=200)
     plot.set_xlabels("Average throughput (KBps)", fontsize=12)
     plot.set_ylabels("Battery consumption (%)", fontsize=12)
     plot.fig.set_size_inches(4,4)
@@ -292,19 +284,22 @@ def plot_btry():
     plt.show()
 
 def distplot():
+    """
+    Plots a CDF plot for bandwidth tests
+    """
     sns.set_style("whitegrid")
     all_traces.remove("ferry")
-    #all_traces.remove("metro")
-    #all_traces.remove("tram3")
-    params = get_tests(losses=[0])
+    all_traces.remove("metro")
+    all_traces.remove("tram3")
+    params = get_tests(traces=["ferry"])
     acc = {"reno": [], "cubic": []}
     columns = ["rtt"]
     for p in params:
         data = pd.read_csv(p.file_name)
         avg_tp_limit = compute_avg_tp_limit(p.trace)
         for cca in all_ccas:
-            col = get_column_name(p.test_name, cca, "throughput")
             #col = get_column_name(p.test_name, cca, "rtt")
+            col = get_column_name(p.test_name, cca, "throughput")
             for _, row in data.iterrows():
                 val = row[col]/avg_tp_limit
                 #val = row[col] - p.delay
@@ -314,13 +309,16 @@ def distplot():
     d2 = pd.DataFrame(np.array(acc["cubic"]), columns=columns)
     sns.distplot(d1.rtt, hist=False, color="b", kde_kws={'cumulative': True, 'linestyle':'-'})
     sns.distplot(d2.rtt, hist=False, color="r", kde_kws={'cumulative': True, 'linestyle':'--'})
-    plt.xlabel("Normalized Throughput")
-    #plt.xlabel("RTT without artificial delay (ms)")
-    plt.ylabel("CDF probability")
+    plt.xlabel("Normalized Throughput", fontsize=13)
+    #plt.xlabel("RTT without artificial delay (ms)", fontsize=13)
+    plt.ylabel("CDF probability", fontsize=13)
     #plt.title("CDF normalized RTT without loss, reno (blue, solid line) and cubic (red, dashed line)")
     plt.show()
 
 def find_outlier():
+    """
+    Prints a dataframe with filtered values, useful to find outliers
+    """
     all_traces.remove("ferry")
     params = get_tests()
     columns = ["tp_norm", "trace", "test_name", "cca"]
@@ -344,11 +342,11 @@ if __name__ == "__main__":
         param_num = int(args[1])
     except:
         param_num = 0
-    #plot_throughput_delay_scatter()
+    plot_throughput_delay_scatter()
     #plot_throughput_delay_line()
     #plot_btry()
     #for trace in all_traces:
     #    plot_trace(trace)
     #plot_trace("ferry")
-    distplot()
+    #distplot()
     #find_outlier()

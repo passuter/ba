@@ -1,3 +1,8 @@
+"""
+Author: Pascal Suter
+This module is responsible for the GUI that communicates with the user.
+"""
+
 import time
 import queue
 from tkinter import *

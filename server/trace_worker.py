@@ -1,13 +1,15 @@
-import shutil
+"""
+Author: Pascal Suter
+This modules handles the loading of a trace from a file to a class Trace.
+It can be used to add new kinds of traces that can be loaded.
+To add a new handler, create a function in this file and add it to the handler_mapping in the function init
+"""
 
+import shutil
 from data_structures import Trace, Dev_config, Device
 import iperf_server, server_frontend
 
 
-"""
-This file handles the conversion of traces to the required format.
-To add a new handler, create a function in this file and add it to the handler_mapping in function init
-"""
 handler_mapping:dict = dict()
 emulating_interval:int
 

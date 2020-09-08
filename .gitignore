@@ -2,6 +2,8 @@
 /iperf
 /iperf_jni
 /server/__pycache__
+/server/norway_traces
 /server/Test_result
+/server/Test_result_experiments/graphics/old/
 /server/server_settings.txt
 /Test_results

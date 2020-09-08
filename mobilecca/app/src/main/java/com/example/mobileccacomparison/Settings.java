@@ -1,5 +1,10 @@
 package com.example.mobileccacomparison;
 
+/**
+ * Author: Pascal Suter
+ * This class concerns saving and loading the settings of the phone
+ */
+
 import android.content.Context;
 import android.util.Log;
 

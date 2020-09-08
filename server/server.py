@@ -1,3 +1,8 @@
+"""
+Author: Pascal Suter
+This file contains the socket server and handles transmission of data from phones. It also initializes the frontend.
+"""
+
 import socket
 import select
 import threading
@@ -35,6 +40,9 @@ def start_UI():
     return frontend_thread
 
 def server_loop():
+    """
+    Mainloop of the server.
+    """
     #setup the server
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.bind((HOST, PORT))
@@ -46,7 +54,6 @@ def server_loop():
 
     while(not terminate):
         ready_to_read, ready_to_write, in_error = select.select(socket_list, write_list, socket_list, .5)
-        #print(f"ready_to_write: {ready_to_write}")
         #Read messages from devices
         for s in ready_to_read:
             if (s == server_socket):
@@ -80,8 +87,6 @@ def server_loop():
                 if device.close_flag and (not device.write_buff):
                     remove_device(device)
 
-        #TODO loop over in_error
-
         update()
 
         #if the shutdown flag is set and all messages have ben sent, end the loop
@@ -100,7 +105,7 @@ def update():
             #i == 2 #update available devices
             device_queue.put(devices.copy())
         elif i == 3:
-            pass #TODO implement aborting an test execution
+            pass
     except queue.Empty: pass #no signal received, can continue
 
     try:
@@ -192,6 +197,10 @@ def handle_msg(raw_data, device:Device):
     except KeyError:
         print(f"Invalid msg_type {msg_type}")
     
+"""
+Below are functions that handle a specific message type
+"""
+
 def handle_msg01(msg_data, device:Device):
     print(f"{device.name} writes")
     for str in msg_data:
@@ -282,6 +291,10 @@ def pull_file(src_file, device, dst=f"{results_folder}"):
     return succ
 
 def get_adb_devices():
+    """
+    Returns a list with names of all devices that can be accessed via adb.
+    Note that these names are not the same as those that are specified in the android app and saved in configurations.
+    """
     x = execute("adb devices")
     lines = x.split(f"\n")
     devs = []
@@ -291,6 +304,9 @@ def get_adb_devices():
     return devs
 
 def execute(cmd:str, with_error=False):
+    """
+    Execute a command on the shell.
+    """
     input = cmd.split()
     p = subprocess.Popen(input, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     stdout, stderr = p.communicate()
@@ -299,6 +315,9 @@ def execute(cmd:str, with_error=False):
     return stdout.decode("utf-8").strip()
 
 def execute_multiple(cmds:list, with_error=False):
+    """
+    Execute multiple commands on the shell.
+    """
     out = ""
     for cmd in cmds:
         out += execute(cmd, with_error) + f"\n"

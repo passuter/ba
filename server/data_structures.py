@@ -1,3 +1,8 @@
+"""
+Author: Pascal Suter
+This module contains classes used by other modules. These classes are usually used across multiple modules.
+"""
+
 from os import path
 from datetime import datetime
 

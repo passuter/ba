@@ -1,5 +1,10 @@
 package com.example.mobileccacomparison;
 
+/**
+ * Author: Pascal Suter
+ * This class displays errors encountered when changing the settings fails.
+ */
+
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.os.Bundle;

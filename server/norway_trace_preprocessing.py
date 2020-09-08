@@ -1,11 +1,13 @@
+"""
+Author: Pascal Suter
+This module preprocesses the norway traces as specified for the bachelor thesis
+i.e. selects random 2min interval and adds (hardcoded) delay & loss 
+"""
+
 from tkinter import filedialog
 from random import randrange
 import sys
 
-"""
-This file preprocesses the norway traces as specified for the bachelor thesis
-i.e. selects random 2min interval and adds (hardcoded) delay & loss 
-"""
 
 dst_folder = "loss_traces"
 

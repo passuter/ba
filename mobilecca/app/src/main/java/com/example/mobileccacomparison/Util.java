@@ -1,5 +1,10 @@
 package com.example.mobileccacomparison;
 
+/**
+ * Author: Pascal Suter
+ * This class contains utility function to be used by other classes, such as executing a command on the shell, and makes certain values globally accessible.
+ */
+
 
 import android.content.Context;
 import android.content.Intent;

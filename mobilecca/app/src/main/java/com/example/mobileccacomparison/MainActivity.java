@@ -1,5 +1,10 @@
 package com.example.mobileccacomparison;
 
+/**
+ * Author: Pascal Suter
+ * This class handles the startup of the app.
+ */
+
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.content.Intent;

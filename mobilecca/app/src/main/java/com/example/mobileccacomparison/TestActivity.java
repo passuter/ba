@@ -1,5 +1,10 @@
 package com.example.mobileccacomparison;
 
+/**
+ * Author: Pascal Suter
+ * This class is used for debugging and testing.
+ */
+
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.os.Bundle;

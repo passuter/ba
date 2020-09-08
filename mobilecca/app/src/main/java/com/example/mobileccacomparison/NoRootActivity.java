@@ -1,5 +1,10 @@
 package com.example.mobileccacomparison;
 
+/**
+ * Author: Pascal Suter
+ * This class displays an error if the app has no root permission. Used by MainActivity.java
+ */
+
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.os.Bundle;

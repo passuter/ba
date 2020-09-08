@@ -1,6 +1,16 @@
 package com.example.mobileccacomparison;
 
+/**
+ * Author: Pascal Suter
+ * This class
+ */
+
 import androidx.appcompat.app.AppCompatActivity;
+
+/**
+ * Author: Pascal Suter
+ * This class creates the screen that the user can use to change the settings of the phone
+ */
 
 import android.content.Intent;
 import android.os.Bundle;

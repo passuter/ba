@@ -1,5 +1,10 @@
 package com.example.mobileccacomparison;
 
+/**
+ * Author: Pascal Suter
+ * Creates the main screen of the app
+ */
+
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.content.Intent;

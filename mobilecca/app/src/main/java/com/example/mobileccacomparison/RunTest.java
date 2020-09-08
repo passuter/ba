@@ -1,5 +1,10 @@
 package com.example.mobileccacomparison;
 
+/**
+ * Author: Pascal Suter
+ * This class runs a test
+ */
+
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;

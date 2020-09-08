@@ -1,3 +1,8 @@
+"""
+Author: Pascal Suter
+This module starts the iPerf instances and the network emulator for a test.
+"""
+
 import subprocess
 import os
 import shutil
@@ -13,14 +18,14 @@ from data_structures import *
 print_error = print #global function for printing errors
 traces:dict = dict() #mapping of traces files to Trace objects
 netem_thread = None
-iperf_processes = []
-running = False
+iperf_processes = [] #list of all processes running iperf instances
+running = False #boolean used to stopped the network emulator
 emulating_interval = 100 #sleep interval in ms for trace emulation, set to 0 to never sleep
 
 def setup():
     """
-    This function prepares the iperf server
-    Returns True if it succeeded and False otherwise
+    Prepares the iperf server and network emulator. If it succeeds, the emulator can be started by calling start_emulating().
+    Returns True if it succeeded and False otherwise.
     """
     #Check if the shell can execute commands
     try:
@@ -46,12 +51,18 @@ def setup():
     return True
 
 def start_emulating():
+    """
+    Starts the network emulator.
+    """
     global running
     running = True
     if netem_thread != None:
         netem_thread.start()
 
 def stop_emulating():
+    """
+    Stops the network emulator.
+    """
     global running
     running = False
     if netem_thread != None:
@@ -106,7 +117,7 @@ def execute_multiple(cmds:list, with_error=False):
 def generate_netem_cmd():
     """
     Generates shell commands to setup netem.
-    Returns the commands or None if no trace has been selected and a mapping of trace_names & flow_ids
+    Returns a tuple of (the commands or None if no trace has been selected) and (a mapping of trace_names & flow_ids)
     """
     dev_configs = server_frontend.active_config.dev_configs
     worklist = [] #list of device configs with a trace
@@ -144,11 +155,14 @@ def generate_netem_cmd():
         device_ip, _ = server_frontend.get_dev_by_name(server_frontend.devices, d.name).addr
         cmds.append(f"sudo tc filter add dev {network_dev} parent 1: protocol ip prio 1 u32 match ip src {device_ip}/32 flowid {flow_id}")
         id_mapping.append((d.trace_name, flow_id))
-        #print(id_mapping)
 
     return cmds, id_mapping
 
 def start_iperf_processes():
+    """
+    Starts an iPerf instance on a newe process for each phone that is part of the test.
+    Each process is appended to the global list iperf_processes.
+    """
     iperf_exe = server_frontend.server_settings.iperf_exec
     for dev_config in server_frontend.active_config.dev_configs:
         _, port = dev_config.addr
@@ -157,6 +171,9 @@ def start_iperf_processes():
         p.start()
 
 def run_iperf(port, iperf_cmd):
+    """
+    Executes a command to start an iperf instance listening on the specified port. 
+    """
     cmd = f"{iperf_cmd} -s -p {port}"
     execute(cmd)
 
@@ -172,7 +189,7 @@ def generate_traces():
 
 def clear_setup():
     """
-    Resets the setup of the iperf server. This should be called always when the active configuration changes to avoid inconsistency during the setup
+    Resets the setup of the iperf server. This should be called always before a new test is started to avoid inconsistency during the setup.
     """
     global netem_thread, traces, running
     netem_thread = None
@@ -185,7 +202,7 @@ def clear_setup():
         ]
         execute_multiple(cmds)
     except FileNotFoundError:
-        #FileNotFoundError occurrs when shel doesn't work (e.g. on windows)
+        #FileNotFoundError occurrs when shell doesn't work (e.g. on windows)
         pass
     while iperf_processes:
         p = iperf_processes.pop()

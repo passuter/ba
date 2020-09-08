@@ -3,8 +3,9 @@ import select
 from time import sleep
 
 """
+Author: Pascal Suter
 This mock client is supposed to test the functionalities of the server.
-Currently it connects to the server & sends an initialization message, then sends a message to be printed
+It can connect to the server and register itself as a device, and receive and respond to a test configuration. It will not generate any data.
 """
 
 terminate_self = False #set this flag so that the mock_client terminates after it sent its messages. On False it will continue to
@@ -48,6 +49,9 @@ def handle_msg11(msg):
     print("Mock client worked")
 
 def handle_msg20(msg):
+    """
+    msg20 is a configuration. The mock client will print the configuration and respond succesfull after 2 seconds
+    """
     conf_name = msg[0]
     length = int(msg[1])
     is_battery = bool(msg[2] == "True")
