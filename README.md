@@ -5,7 +5,7 @@ Comparison framework for mobile congestion control (Bachelor Thesis) Pascal Sute
     Install Android Studio and open the folder mobilecca.
     To run the app on the phone, the phone requires android API 24 (Android 7.0) or higher. The phone must be rooted and permission to use a superuser shell must be granted to the app.
     The app can be installed onto any compatible phone through Android Studio.
-    Install the app MagicIperf from google play (https://play.google.com/store/apps/details?id=com.nextdoordeveloper.miperf.miperf&hl=en)
+    Install the app MagicIperf from google play (https://play.google.com/store/apps/details?id=com.nextdoordeveloper.miperf.miperf&hl=en).
     
 # Python server:
     Requires python 3.7 or newer.
@@ -18,7 +18,9 @@ Comparison framework for mobile congestion control (Bachelor Thesis) Pascal Sute
 # Use of the framework:
 The structure of the control messages that are exchanged between phones and server can be seen in the file "server/structures.txt"
 # Android app:
-    When first starting the app or by pressing the "change settings" button, settings can be changed. Enter a name for the device (must not contain ",") and the IP address and port number of the server. The port of the server can be specified in the file server.py.
+    When first starting the app or by pressing the "change settings" button, settings can be changed.
+    Enter a name for the device (must not contain ",") and the IP address and port number of the server.
+    The port of the server can be specified in the file server.py.
 
 # Python server:
     To start the server, go to the directory "server/" and run the module server.py.
